@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.http.HttpStatus;
@@ -48,64 +49,20 @@ public class FeatureAnnotationService {
         for (FeatureEntry sourceFeature : featureEntries) {
             for (AdductEntry source : entries) {
                 double candidateMass = (sourceFeature.mzValue * source.charge - source.mass) / source.multimer;
-                List<FeatureDTO> matched = findMatchingFeatures(candidateMass, tolerance, featureEntries, sourceFeature.originalIndex);
-                if (matched.isEmpty()) {
-                    continue;
-                }
                 GroupBucket bucket = findOrCreateBucket(buckets, candidateMass, tolerance);
-                addAnnotatedFeature(bucket, sourceFeature.feature, source.canonical);
-                for (FeatureDTO match : matched) {
-                    addAnnotatedFeature(bucket, match, source.canonical);
-                }
+                addAnnotatedFeature(bucket, sourceFeature, source.canonical);
             }
         }
 
         List<AnnotatedFeatureGroupDTO> results = new ArrayList<>();
         for (GroupBucket bucket : buckets) {
+            fillMissingFeatures(bucket, featureEntries, entries, tolerance);
             results.add(bucket.group);
         }
         results = filter(results, minFeatures);
         FeatureAnnotationResponse response = new FeatureAnnotationResponse();
         response.setAnnotatedFeatures(results);
         return response;
-    }
-
-    private List<FeatureDTO> findMatchingFeatures(double candidateMass,
-                                                  double tolerance,
-                                                  List<FeatureEntry> features,
-                                                  int sourceIndex) {
-        List<FeatureDTO> matches = new ArrayList<>();
-        if (features.isEmpty()) {
-            return matches;
-        }
-        double min = candidateMass - tolerance;
-        double max = candidateMass + tolerance;
-
-        int low = 0;
-        int high = features.size();
-        while (low < high) {
-            int mid = (low + high) / 2;
-            if (features.get(mid).mzValue < min) {
-                low = mid + 1;
-            } else {
-                high = mid;
-            }
-        }
-
-        int idx = low;
-        Set<FeatureDTO> unique = new LinkedHashSet<>();
-        while (idx < features.size()) {
-            FeatureEntry entry = features.get(idx);
-            if (entry.mzValue > max) {
-                break;
-            }
-            if (entry.originalIndex != sourceIndex) {
-                unique.add(copyFeature(entry.feature));
-            }
-            idx++;
-        }
-        matches.addAll(unique);
-        return matches;
     }
 
     private List<AdductEntry> loadAdductEntries() {
@@ -120,6 +77,19 @@ public class FeatureAnnotationService {
             }
         }
         return entries;
+    }
+
+    private String resolveAdductForFeature(double mzValue,
+                                           double targetMass,
+                                           double tolerance,
+                                           List<AdductEntry> entries) {
+        for (AdductEntry entry : entries) {
+            double candidateMass = (mzValue * entry.charge - entry.mass) / entry.multimer;
+            if (Math.abs(candidateMass - targetMass) <= tolerance) {
+                return entry.canonical;
+            }
+        }
+        return null;
     }
 
     private FeatureDTO copyFeature(FeatureDTO source) {
@@ -142,47 +112,64 @@ public class FeatureAnnotationService {
             if (group == null || group.getAnnotatedFeatures() == null) {
                 continue;
             }
-            int uniqueCount = countUniqueFeatures(group);
-            if (uniqueCount > 1 && uniqueCount >= minFeatures) {
+            int annotatedCount = countAnnotatedFeatures(group);
+            if (annotatedCount >= minFeatures) {
                 filtered.add(group);
             }
         }
         return filtered;
     }
 
-    private int countUniqueFeatures(AnnotatedFeatureGroupDTO group) {
-        Set<String> keys = new LinkedHashSet<>();
+    private int countAnnotatedFeatures(AnnotatedFeatureGroupDTO group) {
+        int count = 0;
         for (AnnotatedFeatureDTO feature : group.getAnnotatedFeatures()) {
-            if (feature == null) {
-                continue;
+            if (feature != null && feature.getAdduct() != null) {
+                count++;
             }
-            keys.add(buildFeatureKey(feature));
         }
-        return keys.size();
-    }
-
-    private String buildFeatureKey(AnnotatedFeatureDTO feature) {
-        return String.valueOf(feature.getMzValue())
-                + "|" + String.valueOf(feature.getIntensity())
-                + "|" + String.valueOf(feature.getRetentionTime());
+        return count;
     }
 
     private void addAnnotatedFeature(GroupBucket bucket,
-                                     FeatureDTO feature,
+                                     FeatureEntry feature,
                                      String adduct) {
-        if (feature == null) {
+        if (feature == null || feature.feature == null) {
             return;
         }
-        AnnotatedFeatureDTO output = new AnnotatedFeatureDTO();
-        output.setMzValue(feature.getMzValue());
-        output.setIntensity(feature.getIntensity());
-        output.setRetentionTime(feature.getRetentionTime());
+        AnnotatedFeatureDTO existing = bucket.byIndex.get(feature.originalIndex);
+        if (existing != null && existing.getAdduct() != null) {
+            return;
+        }
+        AnnotatedFeatureDTO output = existing != null ? existing : new AnnotatedFeatureDTO();
+        output.setMzValue(feature.feature.getMzValue());
+        output.setIntensity(feature.feature.getIntensity());
+        output.setRetentionTime(feature.feature.getRetentionTime());
         output.setAdduct(adduct);
-        String key = buildFeatureKey(output) + "|" + String.valueOf(adduct);
-        if (!bucket.uniqueKeys.add(key)) {
-            return;
-        }
+        bucket.byIndex.put(feature.originalIndex, output);
         bucket.group.getAnnotatedFeatures().add(output);
+    }
+
+    private void fillMissingFeatures(GroupBucket bucket,
+                                     List<FeatureEntry> featureEntries,
+                                     List<AdductEntry> entries,
+                                     double tolerance) {
+        for (FeatureEntry feature : featureEntries) {
+            if (feature.feature == null) {
+                continue;
+            }
+            AnnotatedFeatureDTO existing = bucket.byIndex.get(feature.originalIndex);
+            if (existing != null && existing.getAdduct() != null) {
+                continue;
+            }
+            String adduct = resolveAdductForFeature(feature.mzValue, bucket.mass, tolerance, entries);
+            AnnotatedFeatureDTO output = existing != null ? existing : new AnnotatedFeatureDTO();
+            output.setMzValue(feature.feature.getMzValue());
+            output.setIntensity(feature.feature.getIntensity());
+            output.setRetentionTime(feature.feature.getRetentionTime());
+            output.setAdduct(adduct);
+            bucket.byIndex.put(feature.originalIndex, output);
+            bucket.group.getAnnotatedFeatures().add(output);
+        }
     }
 
     private GroupBucket findOrCreateBucket(List<GroupBucket> buckets, double candidateMass, double tolerance) {
@@ -225,7 +212,7 @@ public class FeatureAnnotationService {
     private static final class GroupBucket {
         private final double mass;
         private final AnnotatedFeatureGroupDTO group;
-        private final Set<String> uniqueKeys = new LinkedHashSet<>();
+        private final Map<Integer, AnnotatedFeatureDTO> byIndex = new java.util.LinkedHashMap<>();
 
         private GroupBucket(double mass, AnnotatedFeatureGroupDTO group) {
             this.mass = mass;
