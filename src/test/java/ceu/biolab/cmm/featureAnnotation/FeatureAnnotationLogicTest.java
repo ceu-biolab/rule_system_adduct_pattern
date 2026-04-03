@@ -1,0 +1,152 @@
+package ceu.biolab.cmm.featureAnnotation;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+
+import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationEntryDTO;
+import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
+import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
+import ceu.biolab.cmm.shared.domain.IonizationMode;
+import ceu.biolab.cmm.shared.domain.ToleranceMode;
+import ceu.biolab.cmm.shared.domain.adduct.AdductCatalog;
+import ceu.biolab.cmm.shared.domain.adduct.AdductDefinition;
+
+class FeatureAnnotationLogicTest {
+    private static final double PROTON_MASS = 1.007276;
+    private static final double SODIUM_MASS = 22.989218;
+    private static final double ISOTOPE_SPACING_Z2 = 0.5016;
+
+    @Test
+    void detectCharge_z2AndNeutralMass() throws Exception {
+        FeatureAnnotationService service = new FeatureAnnotationService();
+        FeatureAnnotationEntryDTO.FeatureInput peakA = buildFeature(200.0, 1000.0, 1.5);
+        FeatureAnnotationEntryDTO.FeatureInput peakB = buildFeature(200.0 + ISOTOPE_SPACING_Z2, 500.0, 1.5);
+        List<FeatureAnnotationEntryDTO.FeatureInput> signals = List.of(peakA, peakB);
+
+        int charge = (int) invokeDetectCharge(service, peakA, signals);
+        assertEquals(2, charge);
+
+        AdductDefinition twoH = AdductCatalog.definitionsFor(IonizationMode.POSITIVE).get("[M+2H]2+");
+        assertNotNull(twoH);
+
+        double expectedNeutral = 200.0 * 2.0 - (2.0 * PROTON_MASS);
+        double neutralMass = (double) invokeCalculateNeutralMass(service, 200.0, twoH);
+        assertEquals(expectedNeutral, neutralMass, 0.0001);
+    }
+
+    @Test
+    void adductCombination_success() {
+        FeatureAnnotationService service = new FeatureAnnotationService();
+        FeatureAnnotationEntryDTO request = new FeatureAnnotationEntryDTO();
+        request.setToleranceMode(ToleranceMode.PPM);
+
+        double neutralMass = 200.0 - PROTON_MASS;
+        double sodiumMz = neutralMass + SODIUM_MASS;
+
+        request.getFeatures().add(buildFeature(200.0, 1000.0, 1.5));
+        request.getFeatures().add(buildFeature(sodiumMz, 800.0, 1.5));
+
+        FeatureAnnotationResultDTO response = service.transform(request);
+        assertNotNull(response);
+
+        boolean found = response.getResults().stream().anyMatch(group -> {
+            Optional<FeatureAnnotationResultDTO.ResultItem> hItem = findItem(group, 200.0);
+            Optional<FeatureAnnotationResultDTO.ResultItem> naItem = findItem(group, sodiumMz);
+            return hItem.isPresent()
+                    && naItem.isPresent()
+                    && "[M+H]+".equals(hItem.get().getAdduct())
+                    && "[M+Na]+".equals(naItem.get().getAdduct());
+        });
+
+        assertTrue(found);
+    }
+
+    @Test
+    void rtMismatch_filtersAllHypotheses() {
+        FeatureAnnotationService service = new FeatureAnnotationService();
+        FeatureAnnotationEntryDTO request = new FeatureAnnotationEntryDTO();
+        request.setToleranceMode(ToleranceMode.PPM);
+
+        request.getFeatures().add(buildFeature(200.0, 1000.0, 1.2));
+        request.getFeatures().add(buildFeature(221.98, 800.0, 2.8));
+
+        FeatureAnnotationResultDTO response = service.transform(request);
+        assertNotNull(response);
+        assertEquals(0, response.getResults().size());
+    }
+
+    @Test
+    void filterThresholds_largeDatasetRequiresThreeMatches() {
+        FeatureAnnotationService service = new FeatureAnnotationService();
+        FeatureAnnotationResultDTO.AnnotatedFeature hypothesis = new FeatureAnnotationResultDTO.AnnotatedFeature();
+
+        hypothesis.getItems().add(buildResultItem(200.0, "[M+H]+"));
+        hypothesis.getItems().add(buildResultItem(221.98, "[M+Na]+"));
+        hypothesis.getItems().add(buildResultItem(300.0, null));
+        hypothesis.getItems().add(buildResultItem(350.0, null));
+        hypothesis.getItems().add(buildResultItem(400.0, null));
+
+        List<FeatureAnnotationResultDTO.AnnotatedFeature> filtered =
+                service.filter(List.of(hypothesis), 5);
+
+        assertEquals(0, filtered.size());
+    }
+
+    private FeatureAnnotationEntryDTO.FeatureInput buildFeature(double mz, double intensity, double rt) {
+        FeatureAnnotationEntryDTO.FeatureInput input = new FeatureAnnotationEntryDTO.FeatureInput();
+        input.setMzValue(mz);
+        input.setIntensity(intensity);
+        input.setRetentionTime(rt);
+        return input;
+    }
+
+    private FeatureAnnotationResultDTO.ResultItem buildResultItem(double mz, String adduct) {
+        FeatureAnnotationResultDTO.ResultItem item = new FeatureAnnotationResultDTO.ResultItem();
+        item.setMzValue(mz);
+        item.setIntensity(100.0);
+        item.setRetentionTime(1.0);
+        item.setAdduct(adduct);
+        return item;
+    }
+
+    private Optional<FeatureAnnotationResultDTO.ResultItem> findItem(
+            FeatureAnnotationResultDTO.AnnotatedFeature group,
+            double mz) {
+        return group.getItems().stream()
+                .filter(item -> Math.abs(item.getMzValue() - mz) <= 0.0001)
+                .findFirst();
+    }
+
+    private Object invokeDetectCharge(FeatureAnnotationService service,
+                                      FeatureAnnotationEntryDTO.FeatureInput signal,
+                                      List<FeatureAnnotationEntryDTO.FeatureInput> signals) throws Exception {
+        Method method = FeatureAnnotationService.class.getDeclaredMethod("detectCharge",
+                FeatureAnnotationEntryDTO.FeatureInput.class, List.class);
+        method.setAccessible(true);
+        return method.invoke(service, signal, signals);
+    }
+
+    private Object invokeCalculateNeutralMass(FeatureAnnotationService service,
+                                              double mz,
+                                              AdductDefinition adduct) throws Exception {
+        Method method = FeatureAnnotationService.class.getDeclaredMethod("calculateTheoreticalMass",
+                double.class, AdductDefinition.class);
+        method.setAccessible(true);
+        return method.invoke(service, mz, adduct);
+    }
+
+    private List<AdductDefinition> setupMockAdducts() {
+        List<AdductDefinition> adducts = new ArrayList<>();
+        adducts.add(AdductCatalog.definitionsFor(IonizationMode.POSITIVE).get("[M+H]+"));
+        adducts.add(AdductCatalog.definitionsFor(IonizationMode.POSITIVE).get("[M+Na]+"));
+        return adducts;
+    }
+}

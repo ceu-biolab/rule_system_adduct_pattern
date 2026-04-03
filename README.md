@@ -72,13 +72,6 @@ All endpoints live under the `/api` prefix.
 
 ---
 
-## Validation and Error Handling
-
-- All request DTOs use Jakarta Bean Validation to guard against missing values.
-- Controllers annotate request bodies with `@Valid`.
-- Services raise `ResponseStatusException` to provide consistent error responses.
-
----
 
 ## Resources
 
