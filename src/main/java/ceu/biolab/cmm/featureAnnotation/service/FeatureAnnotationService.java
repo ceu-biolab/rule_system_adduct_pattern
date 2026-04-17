@@ -11,7 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationEntryDTO;
+import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
@@ -35,7 +35,7 @@ public class FeatureAnnotationService {
      * @param input feature annotation input payload
      * @return transformed feature annotation output payload
      */
-    public FeatureAnnotationResultDTO transform(FeatureAnnotationEntryDTO input) {
+    public FeatureAnnotationResultDTO transform(FeatureAnnotationRequestDTO input) {
         FeatureAnnotationResultDTO initial = resolveCombinations(input);
         int totalInputPeaks = input == null || input.getFeatures() == null ? 0 : input.getFeatures().size();
         List<FeatureAnnotationResultDTO.AnnotatedFeature> filtered = filter(new ArrayList<>(initial.getResults()), totalInputPeaks);
@@ -75,15 +75,15 @@ public class FeatureAnnotationService {
      * @param input feature annotation input payload
      * @return result DTO with all candidate annotations
      */
-    private FeatureAnnotationResultDTO resolveCombinations(FeatureAnnotationEntryDTO input) {
+    private FeatureAnnotationResultDTO resolveCombinations(FeatureAnnotationRequestDTO input) {
         FeatureAnnotationResultDTO result = new FeatureAnnotationResultDTO();
         if (input == null || input.getFeatures() == null || input.getFeatures().isEmpty()) {
             return result;
         }
 
-        List<FeatureAnnotationEntryDTO.FeatureInput> signals = sortSignals(input.getFeatures());
+        List<FeatureAnnotationRequestDTO.FeatureInput> signals = sortSignals(input.getFeatures());
         List<AdductDefinition> adducts = loadAllAdducts();
-        for (FeatureAnnotationEntryDTO.FeatureInput signal : signals) {
+        for (FeatureAnnotationRequestDTO.FeatureInput signal : signals) {
             int charge = detectCharge(signal, signals);
             for (AdductDefinition sourceAdduct : adducts) {
                 FeatureAnnotationResultDTO.AnnotatedFeature group =
@@ -161,9 +161,9 @@ public class FeatureAnnotationService {
      * @param signals raw input signals
      * @return sorted list of signals
      */
-    private List<FeatureAnnotationEntryDTO.FeatureInput> sortSignals(List<FeatureAnnotationEntryDTO.FeatureInput> signals) {
-        List<FeatureAnnotationEntryDTO.FeatureInput> sorted = new ArrayList<>(signals);
-        sorted.sort(Comparator.comparingDouble(FeatureAnnotationEntryDTO.FeatureInput::getMzValue));
+    private List<FeatureAnnotationRequestDTO.FeatureInput> sortSignals(List<FeatureAnnotationRequestDTO.FeatureInput> signals) {
+        List<FeatureAnnotationRequestDTO.FeatureInput> sorted = new ArrayList<>(signals);
+        sorted.sort(Comparator.comparingDouble(FeatureAnnotationRequestDTO.FeatureInput::getMzValue));
         return sorted;
     }
 
@@ -178,8 +178,8 @@ public class FeatureAnnotationService {
      * @param sourceAdduct adduct hypothesis for the source signal
      * @return grouped annotations for the hypothesis
      */
-    private FeatureAnnotationResultDTO.AnnotatedFeature buildHypothesisGroup(FeatureAnnotationEntryDTO.FeatureInput sourceSignal,
-                                                                             List<FeatureAnnotationEntryDTO.FeatureInput> signals,
+    private FeatureAnnotationResultDTO.AnnotatedFeature buildHypothesisGroup(FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
+                                                                             List<FeatureAnnotationRequestDTO.FeatureInput> signals,
                                                                              List<AdductDefinition> adducts,
                                                                              ToleranceMode toleranceMode,
                                                                              int charge,
@@ -215,14 +215,14 @@ public class FeatureAnnotationService {
      * @return list of matching result items
      */
     private List<FeatureAnnotationResultDTO.ResultItem> buildGroupItems(
-            List<FeatureAnnotationEntryDTO.FeatureInput> signals,
+            List<FeatureAnnotationRequestDTO.FeatureInput> signals,
             double theoreticalMass,
             List<AdductDefinition> adducts,
             ToleranceMode toleranceMode,
-            FeatureAnnotationEntryDTO.FeatureInput sourceSignal,
+            FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
             AdductDefinition sourceAdduct) {
         List<FeatureAnnotationResultDTO.ResultItem> items = new ArrayList<>();
-        for (FeatureAnnotationEntryDTO.FeatureInput candidate : signals) {
+        for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
             String adduct = resolveAdductForSignal(candidate, theoreticalMass, adducts, toleranceMode, sourceSignal);
             if (candidate == sourceSignal) {
                 adduct = sourceAdduct.canonical();
@@ -241,11 +241,11 @@ public class FeatureAnnotationService {
      * @param toleranceMode configured tolerance mode
      * @return canonical adduct label or null when not matched
      */
-    private String resolveAdductForSignal(FeatureAnnotationEntryDTO.FeatureInput signal,
+    private String resolveAdductForSignal(FeatureAnnotationRequestDTO.FeatureInput signal,
                                           double theoreticalMass,
                                           List<AdductDefinition> adducts,
                                           ToleranceMode toleranceMode,
-                                          FeatureAnnotationEntryDTO.FeatureInput sourceSignal) {
+                                          FeatureAnnotationRequestDTO.FeatureInput sourceSignal) {
         if (!isRtCompatible(signal, sourceSignal)) {
             return null;
         }
@@ -270,8 +270,8 @@ public class FeatureAnnotationService {
      * @param reference reference signal
      * @return true when the retention time difference is within tolerance
      */
-    private boolean isRtCompatible(FeatureAnnotationEntryDTO.FeatureInput candidate,
-                                   FeatureAnnotationEntryDTO.FeatureInput reference) {
+    private boolean isRtCompatible(FeatureAnnotationRequestDTO.FeatureInput candidate,
+                                   FeatureAnnotationRequestDTO.FeatureInput reference) {
         return Math.abs(candidate.getRetentionTime() - reference.getRetentionTime()) <= RT_TOLERANCE;
     }
 
@@ -294,12 +294,12 @@ public class FeatureAnnotationService {
      * @param signals full list of signals to compare against
      * @return detected charge state (1, 2, or 3)
      */
-    private int detectCharge(FeatureAnnotationEntryDTO.FeatureInput signal,
-                             List<FeatureAnnotationEntryDTO.FeatureInput> signals) {
+    private int detectCharge(FeatureAnnotationRequestDTO.FeatureInput signal,
+                             List<FeatureAnnotationRequestDTO.FeatureInput> signals) {
         for (int charge = 1; charge <= 3; charge++) {
             double spacing = isotopeSpacingForCharge(charge);
             double expected = signal.getMzValue() + spacing;
-            for (FeatureAnnotationEntryDTO.FeatureInput candidate : signals) {
+            for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
                 if (candidate == signal) {
                     continue;
                 }
@@ -367,7 +367,7 @@ public class FeatureAnnotationService {
      * @param adduct assigned adduct label
      * @return result item
      */
-    private FeatureAnnotationResultDTO.ResultItem toResultItem(FeatureAnnotationEntryDTO.FeatureInput input,
+    private FeatureAnnotationResultDTO.ResultItem toResultItem(FeatureAnnotationRequestDTO.FeatureInput input,
                                                                String adduct) {
         FeatureAnnotationResultDTO.ResultItem item = new FeatureAnnotationResultDTO.ResultItem();
         item.setMzValue(input.getMzValue());

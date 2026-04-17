@@ -1,0 +1,37 @@
+Decision Table Template (XLSX)
+
+Sheet name: Rules
+
+Row 1: RuleSet
+- A1: RuleSet
+- B1: Adduct rules example
+
+Row 2: Import (optional)
+- A2: Import
+- B2: com.example.domain.MyFact
+
+Row 3: RuleTable header
+- A3: RuleTable AdductScoring
+
+Row 4: Column headers
+- A4: NAME
+- B4: CONDITION
+- C4: CONDITION
+- D4: ACTION
+
+Row 5: Column definitions
+- A5:
+- B5: $f: MyFact( adductType == "[M+H]+" )
+- C5: $f: MyFact( mz > 100.0 )
+- D5: $f.setScore( 0.8 );
+
+Row 6+: Rules
+- A6: Rule_1
+- B6: [blank] (condition from B5 applied)
+- C6: [blank] (condition from C5 applied)
+- D6: [blank] (action from D5 applied)
+
+Notes:
+- Conditions and actions follow DRL syntax.
+- Add more CONDITION/ACTION columns as needed.
+- Save as .xlsx and drop into src/main/resources/rules/.

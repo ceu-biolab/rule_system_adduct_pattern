@@ -11,7 +11,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
-import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationEntryDTO;
+import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
@@ -27,9 +27,9 @@ class FeatureAnnotationLogicTest {
     @Test
     void detectCharge_z2AndNeutralMass() throws Exception {
         FeatureAnnotationService service = new FeatureAnnotationService();
-        FeatureAnnotationEntryDTO.FeatureInput peakA = buildFeature(200.0, 1000.0, 1.5);
-        FeatureAnnotationEntryDTO.FeatureInput peakB = buildFeature(200.0 + ISOTOPE_SPACING_Z2, 500.0, 1.5);
-        List<FeatureAnnotationEntryDTO.FeatureInput> signals = List.of(peakA, peakB);
+        FeatureAnnotationRequestDTO.FeatureInput peakA = buildFeature(200.0, 1000.0, 1.5);
+        FeatureAnnotationRequestDTO.FeatureInput peakB = buildFeature(200.0 + ISOTOPE_SPACING_Z2, 500.0, 1.5);
+        List<FeatureAnnotationRequestDTO.FeatureInput> signals = List.of(peakA, peakB);
 
         int charge = (int) invokeDetectCharge(service, peakA, signals);
         assertEquals(2, charge);
@@ -45,7 +45,7 @@ class FeatureAnnotationLogicTest {
     @Test
     void adductCombination_success() {
         FeatureAnnotationService service = new FeatureAnnotationService();
-        FeatureAnnotationEntryDTO request = new FeatureAnnotationEntryDTO();
+        FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
         request.setToleranceMode(ToleranceMode.PPM);
 
         double neutralMass = 200.0 - PROTON_MASS;
@@ -72,7 +72,7 @@ class FeatureAnnotationLogicTest {
     @Test
     void rtMismatch_filtersAllHypotheses() {
         FeatureAnnotationService service = new FeatureAnnotationService();
-        FeatureAnnotationEntryDTO request = new FeatureAnnotationEntryDTO();
+        FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
         request.setToleranceMode(ToleranceMode.PPM);
 
         request.getFeatures().add(buildFeature(200.0, 1000.0, 1.2));
@@ -100,8 +100,8 @@ class FeatureAnnotationLogicTest {
         assertEquals(0, filtered.size());
     }
 
-    private FeatureAnnotationEntryDTO.FeatureInput buildFeature(double mz, double intensity, double rt) {
-        FeatureAnnotationEntryDTO.FeatureInput input = new FeatureAnnotationEntryDTO.FeatureInput();
+    private FeatureAnnotationRequestDTO.FeatureInput buildFeature(double mz, double intensity, double rt) {
+        FeatureAnnotationRequestDTO.FeatureInput input = new FeatureAnnotationRequestDTO.FeatureInput();
         input.setMzValue(mz);
         input.setIntensity(intensity);
         input.setRetentionTime(rt);
@@ -126,10 +126,10 @@ class FeatureAnnotationLogicTest {
     }
 
     private Object invokeDetectCharge(FeatureAnnotationService service,
-                                      FeatureAnnotationEntryDTO.FeatureInput signal,
-                                      List<FeatureAnnotationEntryDTO.FeatureInput> signals) throws Exception {
+                                          FeatureAnnotationRequestDTO.FeatureInput signal,
+                                          List<FeatureAnnotationRequestDTO.FeatureInput> signals) throws Exception {
         Method method = FeatureAnnotationService.class.getDeclaredMethod("detectCharge",
-                FeatureAnnotationEntryDTO.FeatureInput.class, List.class);
+                            FeatureAnnotationRequestDTO.FeatureInput.class, List.class);
         method.setAccessible(true);
         return method.invoke(service, signal, signals);
     }

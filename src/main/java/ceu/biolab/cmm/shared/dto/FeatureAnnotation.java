@@ -1,9 +1,7 @@
-package ceu.biolab.cmm.featureAnnotation.dto;
+package ceu.biolab.cmm.shared.dto;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import ceu.biolab.cmm.shared.domain.ToleranceMode;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
@@ -11,17 +9,16 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-@Data
-public class FeatureAnnotationEntryDTO {
-    @NotEmpty
-    @Valid
-    private List<FeatureInput> features = new ArrayList<>();
-
-    @NotNull
-    private ToleranceMode toleranceMode;
+public class FeatureAnnotation {
+    @Data
+    public static class AnnotatedFeature {
+        @NotEmpty
+        @Valid
+        private Set<ResultItem> items = new LinkedHashSet<>();
+    }
 
     @Data
-    public static class FeatureInput {
+    public static class ResultItem {
         @NotNull
         @JsonProperty("mzValue")
         private Double mzValue;
@@ -33,5 +30,8 @@ public class FeatureAnnotationEntryDTO {
         @NotNull
         @JsonProperty("retentionTime")
         private Double retentionTime;
+
+        @JsonProperty("adduct")
+        private String adduct;
     }
 }

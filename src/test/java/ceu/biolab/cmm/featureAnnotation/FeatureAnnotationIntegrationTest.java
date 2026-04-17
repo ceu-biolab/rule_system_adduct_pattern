@@ -10,7 +10,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
-import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationEntryDTO;
+import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
@@ -26,7 +26,7 @@ class FeatureAnnotationIntegrationTest {
     @Test
     void simpleDataset_twoPeaksSameRt_shouldKeepHypothesis() {
         // Feature B is at 200.0 + 1.007276, so it matches the [M+H]+ adduct if M = 200.0.
-        FeatureAnnotationEntryDTO request = new FeatureAnnotationEntryDTO();
+        FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
         request.setToleranceMode(ToleranceMode.PPM);
         request.getFeatures().add(buildFeature(200.0, 1000.0, 1.2));
         request.getFeatures().add(buildFeature(200.0 + PROTON_MASS, 500.0, 1.2));
@@ -48,7 +48,7 @@ class FeatureAnnotationIntegrationTest {
     @Test
     void complexDataset_detectsNeutralMassAndMatches() {
         // M = 300.0; [M+H]+ = 301.007276, [M+Na]+ = 322.989218, [M+NH4]+ = 318.033823.
-        FeatureAnnotationEntryDTO request = new FeatureAnnotationEntryDTO();
+        FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
         request.setToleranceMode(ToleranceMode.PPM);
         request.getFeatures().add(buildFeature(300.0 + PROTON_MASS, 1200.0, 1.2));
         request.getFeatures().add(buildFeature(300.0 + SODIUM_MASS, 1100.0, 1.2));
@@ -80,7 +80,7 @@ class FeatureAnnotationIntegrationTest {
     @Test
     void rtMismatch_discardsAllResults() {
         // RT mismatch (1.2 vs 5.0) should prevent adduct support across peaks.
-        FeatureAnnotationEntryDTO request = new FeatureAnnotationEntryDTO();
+        FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
         request.setToleranceMode(ToleranceMode.PPM);
         request.getFeatures().add(buildFeature(200.0, 1000.0, 1.2));
         request.getFeatures().add(buildFeature(200.0 + SODIUM_MASS, 800.0, 5.0));
@@ -108,8 +108,8 @@ class FeatureAnnotationIntegrationTest {
         assertEquals(0, filtered.size());
     }
 
-    private FeatureAnnotationEntryDTO.FeatureInput buildFeature(double mz, double intensity, double rt) {
-        FeatureAnnotationEntryDTO.FeatureInput input = new FeatureAnnotationEntryDTO.FeatureInput();
+    private FeatureAnnotationRequestDTO.FeatureInput buildFeature(double mz, double intensity, double rt) {
+        FeatureAnnotationRequestDTO.FeatureInput input = new FeatureAnnotationRequestDTO.FeatureInput();
         input.setMzValue(mz);
         input.setIntensity(intensity);
         input.setRetentionTime(rt);

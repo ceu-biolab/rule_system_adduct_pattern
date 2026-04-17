@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationEntryDTO;
+import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
 import jakarta.validation.Valid;
@@ -31,7 +31,7 @@ public class FeatureAnnotationController {
      * @return feature annotation output payload
      */
     @PostMapping("/annotate-feature")
-    public FeatureAnnotationResultDTO annotateFeature(@Valid @RequestBody FeatureAnnotationEntryDTO request) {
+    public FeatureAnnotationResultDTO annotateFeature(@Valid @RequestBody FeatureAnnotationRequestDTO request) {
         return featureAnnotationService.transform(request);
     }
 }
