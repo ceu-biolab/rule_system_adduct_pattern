@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
 import ceu.biolab.cmm.shared.domain.adduct.AdductCatalog;
@@ -58,8 +59,8 @@ class FeatureAnnotationLogicTest {
         assertNotNull(response);
 
         boolean found = response.getResults().stream().anyMatch(group -> {
-            Optional<FeatureAnnotationResultDTO.ResultItem> hItem = findItem(group, 200.0);
-            Optional<FeatureAnnotationResultDTO.ResultItem> naItem = findItem(group, sodiumMz);
+            Optional<FeatureAnnotation.ResultItem> hItem = findItem(group, 200.0);
+            Optional<FeatureAnnotation.ResultItem> naItem = findItem(group, sodiumMz);
             return hItem.isPresent()
                     && naItem.isPresent()
                     && "[M+H]+".equals(hItem.get().getAdduct())
@@ -86,7 +87,7 @@ class FeatureAnnotationLogicTest {
     @Test
     void filterThresholds_largeDatasetRequiresThreeMatches() {
         FeatureAnnotationService service = new FeatureAnnotationService();
-        FeatureAnnotationResultDTO.AnnotatedFeature hypothesis = new FeatureAnnotationResultDTO.AnnotatedFeature();
+        FeatureAnnotation.AnnotatedFeature hypothesis = new FeatureAnnotation.AnnotatedFeature();
 
         hypothesis.getItems().add(buildResultItem(200.0, "[M+H]+"));
         hypothesis.getItems().add(buildResultItem(221.98, "[M+Na]+"));
@@ -94,7 +95,7 @@ class FeatureAnnotationLogicTest {
         hypothesis.getItems().add(buildResultItem(350.0, null));
         hypothesis.getItems().add(buildResultItem(400.0, null));
 
-        List<FeatureAnnotationResultDTO.AnnotatedFeature> filtered =
+        List<FeatureAnnotation.AnnotatedFeature> filtered =
                 service.filter(List.of(hypothesis), 5);
 
         assertEquals(0, filtered.size());
@@ -108,8 +109,8 @@ class FeatureAnnotationLogicTest {
         return input;
     }
 
-    private FeatureAnnotationResultDTO.ResultItem buildResultItem(double mz, String adduct) {
-        FeatureAnnotationResultDTO.ResultItem item = new FeatureAnnotationResultDTO.ResultItem();
+    private FeatureAnnotation.ResultItem buildResultItem(double mz, String adduct) {
+        FeatureAnnotation.ResultItem item = new FeatureAnnotation.ResultItem();
         item.setMzValue(mz);
         item.setIntensity(100.0);
         item.setRetentionTime(1.0);
@@ -117,8 +118,8 @@ class FeatureAnnotationLogicTest {
         return item;
     }
 
-    private Optional<FeatureAnnotationResultDTO.ResultItem> findItem(
-            FeatureAnnotationResultDTO.AnnotatedFeature group,
+    private Optional<FeatureAnnotation.ResultItem> findItem(
+            FeatureAnnotation.AnnotatedFeature group,
             double mz) {
         return group.getItems().stream()
                 .filter(item -> Math.abs(item.getMzValue() - mz) <= 0.0001)

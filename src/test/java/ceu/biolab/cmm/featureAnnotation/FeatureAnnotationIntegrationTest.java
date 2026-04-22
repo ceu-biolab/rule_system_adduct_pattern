@@ -13,33 +13,34 @@ import org.junit.jupiter.api.Test;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
 
 class FeatureAnnotationIntegrationTest {
     private static final double PROTON_MASS = 1.007276;
     private static final double SODIUM_MASS = 22.989218;
     private static final double AMMONIUM_MASS = 18.033823;
-    private static final double POTASSIUM_MASS = 38.963158;
+    private static final double TWO_M_H_MASS = 1.007276;
     private static final double TWO_H_MASS = 2.014552;
     private static final double ISOTOPE_SPACING = 1.003355;
 
     @Test
     void simpleDataset_twoPeaksSameRt_shouldKeepHypothesis() {
-        // Feature B is at 200.0 + 1.007276, so it matches the [M+H]+ adduct if M = 200.0.
+        // M = 200.0; [M+H]+ and [M+Na]+ should both match at the same RT.
         FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
         request.setToleranceMode(ToleranceMode.PPM);
-        request.getFeatures().add(buildFeature(200.0, 1000.0, 1.2));
-        request.getFeatures().add(buildFeature(200.0 + PROTON_MASS, 500.0, 1.2));
+        request.getFeatures().add(buildFeature(200.0 + PROTON_MASS, 1000.0, 1.2));
+        request.getFeatures().add(buildFeature(200.0 + SODIUM_MASS, 500.0, 1.2));
 
         FeatureAnnotationResultDTO response = new FeatureAnnotationService().transform(request);
         assertNotNull(response);
 
         boolean found = response.getResults().stream().anyMatch(group -> {
-            Optional<FeatureAnnotationResultDTO.ResultItem> a = findItem(group, 200.0);
-            Optional<FeatureAnnotationResultDTO.ResultItem> b = findItem(group, 200.0 + PROTON_MASS);
-            return a.isPresent() && b.isPresent()
-                    && a.get().getAdduct() != null
-                    && b.get().getAdduct() != null;
+            Optional<FeatureAnnotation.ResultItem> h = findItem(group, 200.0 + PROTON_MASS);
+            Optional<FeatureAnnotation.ResultItem> na = findItem(group, 200.0 + SODIUM_MASS);
+            return h.isPresent() && na.isPresent()
+                    && "[M+H]+".equals(h.get().getAdduct())
+                    && "[M+Na]+".equals(na.get().getAdduct());
         });
 
         assertTrue(found);
@@ -63,10 +64,10 @@ class FeatureAnnotationIntegrationTest {
         assertNotNull(response);
 
         boolean found = response.getResults().stream().anyMatch(group -> {
-            Optional<FeatureAnnotationResultDTO.ResultItem> h = findItem(group, 300.0 + PROTON_MASS);
-            Optional<FeatureAnnotationResultDTO.ResultItem> na = findItem(group, 300.0 + SODIUM_MASS);
-            Optional<FeatureAnnotationResultDTO.ResultItem> nh4 = findItem(group, 300.0 + AMMONIUM_MASS);
-            Optional<FeatureAnnotationResultDTO.ResultItem> z2 = findItem(group, (300.0 + TWO_H_MASS) / 2.0);
+            Optional<FeatureAnnotation.ResultItem> h = findItem(group, 300.0 + PROTON_MASS);
+            Optional<FeatureAnnotation.ResultItem> na = findItem(group, 300.0 + SODIUM_MASS);
+            Optional<FeatureAnnotation.ResultItem> nh4 = findItem(group, 300.0 + AMMONIUM_MASS);
+            Optional<FeatureAnnotation.ResultItem> z2 = findItem(group, (300.0 + TWO_H_MASS) / 2.0);
             return h.isPresent() && na.isPresent() && nh4.isPresent() && z2.isPresent()
                     && "[M+H]+".equals(h.get().getAdduct())
                     && "[M+Na]+".equals(na.get().getAdduct())
@@ -93,7 +94,7 @@ class FeatureAnnotationIntegrationTest {
     @Test
     void filterThreshold_discardsWhenNGreaterThanFour() {
         FeatureAnnotationService service = new FeatureAnnotationService();
-        FeatureAnnotationResultDTO.AnnotatedFeature hypothesis = new FeatureAnnotationResultDTO.AnnotatedFeature();
+        FeatureAnnotation.AnnotatedFeature hypothesis = new FeatureAnnotation.AnnotatedFeature();
 
         // Two matches and three nulls simulate a noisy dataset with only two supported peaks.
         hypothesis.getItems().add(buildResultItem(200.0, "[M+H]+"));
@@ -102,7 +103,7 @@ class FeatureAnnotationIntegrationTest {
         hypothesis.getItems().add(buildResultItem(350.0, null));
         hypothesis.getItems().add(buildResultItem(400.0, null));
 
-        List<FeatureAnnotationResultDTO.AnnotatedFeature> filtered =
+        List<FeatureAnnotation.AnnotatedFeature> filtered =
                 service.filter(List.of(hypothesis), 5);
 
         assertEquals(0, filtered.size());
@@ -116,8 +117,8 @@ class FeatureAnnotationIntegrationTest {
         return input;
     }
 
-    private FeatureAnnotationResultDTO.ResultItem buildResultItem(double mz, String adduct) {
-        FeatureAnnotationResultDTO.ResultItem item = new FeatureAnnotationResultDTO.ResultItem();
+    private FeatureAnnotation.ResultItem buildResultItem(double mz, String adduct) {
+        FeatureAnnotation.ResultItem item = new FeatureAnnotation.ResultItem();
         item.setMzValue(mz);
         item.setIntensity(100.0);
         item.setRetentionTime(1.0);
@@ -125,8 +126,8 @@ class FeatureAnnotationIntegrationTest {
         return item;
     }
 
-    private Optional<FeatureAnnotationResultDTO.ResultItem> findItem(
-            FeatureAnnotationResultDTO.AnnotatedFeature group,
+    private Optional<FeatureAnnotation.ResultItem> findItem(
+            FeatureAnnotation.AnnotatedFeature group,
             double mz) {
         return group.getItems().stream()
                 .filter(item -> Math.abs(item.getMzValue() - mz) <= 0.0001)

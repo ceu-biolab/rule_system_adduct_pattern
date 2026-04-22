@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
 import ceu.biolab.cmm.shared.domain.adduct.AdductCatalog;
@@ -38,7 +39,7 @@ public class FeatureAnnotationService {
     public FeatureAnnotationResultDTO transform(FeatureAnnotationRequestDTO input) {
         FeatureAnnotationResultDTO initial = resolveCombinations(input);
         int totalInputPeaks = input == null || input.getFeatures() == null ? 0 : input.getFeatures().size();
-        List<FeatureAnnotationResultDTO.AnnotatedFeature> filtered = filter(new ArrayList<>(initial.getResults()), totalInputPeaks);
+        List<FeatureAnnotation.AnnotatedFeature> filtered = filter(new ArrayList<>(initial.getResults()), totalInputPeaks);
         FeatureAnnotationResultDTO output = new FeatureAnnotationResultDTO();
         output.getResults().addAll(filtered);
         return output;
@@ -51,15 +52,15 @@ public class FeatureAnnotationService {
      * @param totalInputPeaks total number of input peaks (N)
      * @return filtered hypotheses
      */
-    public List<FeatureAnnotationResultDTO.AnnotatedFeature> filter(
-            List<FeatureAnnotationResultDTO.AnnotatedFeature> results,
+        public List<FeatureAnnotation.AnnotatedFeature> filter(
+            List<FeatureAnnotation.AnnotatedFeature> results,
             int totalInputPeaks) {
         if (results == null || results.isEmpty()) {
             return List.of();
         }
 
         int threshold = totalInputPeaks > 4 ? 3 : 2;
-        List<FeatureAnnotationResultDTO.AnnotatedFeature> passed = results.stream()
+        List<FeatureAnnotation.AnnotatedFeature> passed = results.stream()
                 .filter(result -> countMatches(result) >= threshold)
                 .collect(Collectors.toList());
 
@@ -86,7 +87,7 @@ public class FeatureAnnotationService {
         for (FeatureAnnotationRequestDTO.FeatureInput signal : signals) {
             int charge = detectCharge(signal, signals);
             for (AdductDefinition sourceAdduct : adducts) {
-                FeatureAnnotationResultDTO.AnnotatedFeature group =
+                FeatureAnnotation.AnnotatedFeature group =
                         buildHypothesisGroup(signal, signals, adducts, input.getToleranceMode(), charge, sourceAdduct);
                 if (group != null && !group.getItems().isEmpty()) {
                     result.getResults().add(group);
@@ -102,7 +103,7 @@ public class FeatureAnnotationService {
      * @param result hypothesis to analyze
      * @return number of matches
      */
-    private long countMatches(FeatureAnnotationResultDTO.AnnotatedFeature result) {
+    private long countMatches(FeatureAnnotation.AnnotatedFeature result) {
         if (result == null || result.getItems() == null) {
             return 0;
         }
@@ -117,10 +118,10 @@ public class FeatureAnnotationService {
      * @param results filtered hypotheses
      * @return deduplicated hypotheses
      */
-    private List<FeatureAnnotationResultDTO.AnnotatedFeature> deduplicate(
-            List<FeatureAnnotationResultDTO.AnnotatedFeature> results) {
-        Map<String, FeatureAnnotationResultDTO.AnnotatedFeature> unique = new LinkedHashMap<>();
-        for (FeatureAnnotationResultDTO.AnnotatedFeature result : results) {
+    private List<FeatureAnnotation.AnnotatedFeature> deduplicate(
+            List<FeatureAnnotation.AnnotatedFeature> results) {
+        Map<String, FeatureAnnotation.AnnotatedFeature> unique = new LinkedHashMap<>();
+        for (FeatureAnnotation.AnnotatedFeature result : results) {
             String signature = buildSignature(result);
             unique.putIfAbsent(signature, result);
         }
@@ -133,7 +134,7 @@ public class FeatureAnnotationService {
      * @param result hypothesis to fingerprint
      * @return signature string
      */
-    private String buildSignature(FeatureAnnotationResultDTO.AnnotatedFeature result) {
+    private String buildSignature(FeatureAnnotation.AnnotatedFeature result) {
         if (result == null || result.getItems() == null) {
             return "";
         }
@@ -150,7 +151,7 @@ public class FeatureAnnotationService {
      * @param item result item
      * @return signature component
      */
-    private String signaturePart(FeatureAnnotationResultDTO.ResultItem item) {
+    private String signaturePart(FeatureAnnotation.ResultItem item) {
         String adduct = item.getAdduct() == null ? "" : item.getAdduct();
         return item.getMzValue() + ":" + item.getIntensity() + ":" + item.getRetentionTime() + ":" + adduct;
     }
@@ -178,7 +179,7 @@ public class FeatureAnnotationService {
      * @param sourceAdduct adduct hypothesis for the source signal
      * @return grouped annotations for the hypothesis
      */
-    private FeatureAnnotationResultDTO.AnnotatedFeature buildHypothesisGroup(FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
+    private FeatureAnnotation.AnnotatedFeature buildHypothesisGroup(FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
                                                                              List<FeatureAnnotationRequestDTO.FeatureInput> signals,
                                                                              List<AdductDefinition> adducts,
                                                                              ToleranceMode toleranceMode,
@@ -189,7 +190,7 @@ public class FeatureAnnotationService {
         }
 
         double theoreticalMass = calculateTheoreticalMass(sourceSignal.getMzValue(), sourceAdduct);
-        FeatureAnnotationResultDTO.AnnotatedFeature group = new FeatureAnnotationResultDTO.AnnotatedFeature();
+        FeatureAnnotation.AnnotatedFeature group = new FeatureAnnotation.AnnotatedFeature();
         group.getItems().addAll(buildGroupItems(signals, theoreticalMass, adducts, toleranceMode, sourceSignal, sourceAdduct));
         return group;
     }
@@ -214,14 +215,14 @@ public class FeatureAnnotationService {
      * @param toleranceMode configured tolerance mode
      * @return list of matching result items
      */
-    private List<FeatureAnnotationResultDTO.ResultItem> buildGroupItems(
+    private List<FeatureAnnotation.ResultItem> buildGroupItems(
             List<FeatureAnnotationRequestDTO.FeatureInput> signals,
             double theoreticalMass,
             List<AdductDefinition> adducts,
             ToleranceMode toleranceMode,
             FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
             AdductDefinition sourceAdduct) {
-        List<FeatureAnnotationResultDTO.ResultItem> items = new ArrayList<>();
+        List<FeatureAnnotation.ResultItem> items = new ArrayList<>();
         for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
             String adduct = resolveAdductForSignal(candidate, theoreticalMass, adducts, toleranceMode, sourceSignal);
             if (candidate == sourceSignal) {
@@ -367,9 +368,9 @@ public class FeatureAnnotationService {
      * @param adduct assigned adduct label
      * @return result item
      */
-    private FeatureAnnotationResultDTO.ResultItem toResultItem(FeatureAnnotationRequestDTO.FeatureInput input,
-                                                               String adduct) {
-        FeatureAnnotationResultDTO.ResultItem item = new FeatureAnnotationResultDTO.ResultItem();
+    private FeatureAnnotation.ResultItem toResultItem(FeatureAnnotationRequestDTO.FeatureInput input,
+                                                      String adduct) {
+        FeatureAnnotation.ResultItem item = new FeatureAnnotation.ResultItem();
         item.setMzValue(input.getMzValue());
         item.setIntensity(input.getIntensity());
         item.setRetentionTime(input.getRetentionTime());
