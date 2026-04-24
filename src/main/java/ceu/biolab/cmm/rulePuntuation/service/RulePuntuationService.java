@@ -28,8 +28,8 @@ public class RulePuntuationService {
         KieSession kieSession = kieContainer.newKieSession();
         try {
             kieSession.insert(request);
-            if (request.getFeatures() != null) {
-                for (var item : request.getFeatures()) {
+            if (request.getFeature() != null && request.getFeature().getItems() != null) {
+                for (var item : request.getFeature().getItems()) {
                     if (item != null) {
                         kieSession.insert(item);
                     }
@@ -39,8 +39,11 @@ public class RulePuntuationService {
             int firedRules = kieSession.fireAllRules();
             logger.info("Drools rules fired: {}", firedRules);
             //logger.info("Target candidate: {}", request.getTargetCandidate());
-                int items = request.getFeatures() == null ? 0 : request.getFeatures().size();
-                logger.info("Feature items: {}", items);
+            int items = 0;
+            if (request.getFeature() != null && request.getFeature().getItems() != null) {
+                items = request.getFeature().getItems().size();
+            }
+            logger.info("Feature items: {}", items);
             logger.info("Score after rules: {}", request.getScore());
             RulePuntuationResponseDTO response = new RulePuntuationResponseDTO();
             response.setScore(request.getScore());
