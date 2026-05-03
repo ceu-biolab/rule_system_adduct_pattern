@@ -8,9 +8,6 @@ import org.kie.api.builder.KieFileSystem;
 import org.kie.api.builder.Results;
 import org.kie.api.io.ResourceType;
 import org.kie.api.runtime.KieContainer;
-import org.kie.internal.builder.DecisionTableConfiguration;
-import org.kie.internal.builder.DecisionTableInputType;
-import org.kie.internal.builder.KnowledgeBuilderFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
@@ -25,18 +22,14 @@ public class DroolsConfig {
         KieServices kieServices = KieServices.Factory.get();
         KieFileSystem kieFileSystem = kieServices.newKieFileSystem();
 
-        DecisionTableConfiguration decisionTableConfig = KnowledgeBuilderFactory.newDecisionTableConfiguration();
-        decisionTableConfig.setInputType(DecisionTableInputType.XLSX);
-
         ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-        Resource[] decisionTables = resolver.getResources("classpath*:rules/**/*.xlsx");
+        Resource[] drlRules = resolver.getResources("classpath*:rules/**/*.drl");
 
-        for (Resource decisionTable : decisionTables) {
+        for (Resource rule : drlRules) {
             org.kie.api.io.Resource kieResource = kieServices.getResources()
-                    .newInputStreamResource(decisionTable.getInputStream());
-            kieResource.setResourceType(ResourceType.DTABLE);
-            kieResource.setConfiguration(decisionTableConfig);
-            kieResource.setSourcePath("rules/" + decisionTable.getFilename());
+                .newInputStreamResource(rule.getInputStream());
+            kieResource.setResourceType(ResourceType.DRL);
+            kieResource.setSourcePath("rules/" + rule.getFilename());
             kieFileSystem.write(kieResource);
         }
 

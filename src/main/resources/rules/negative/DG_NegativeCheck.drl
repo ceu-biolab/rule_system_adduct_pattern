@@ -1,0 +1,141 @@
+package rules_id_lipid_expert_knowledge.negative;
+
+import io.github.mzmine.datamodel.FoundLipid;
+import io.github.mzmine.datamodel.FoundAdduct;
+import io.github.mzmine.datamodel.MobilePhases;
+ 
+import java.util.List;
+
+// Declare the global list
+global FoundLipid lipid;
+global List mobilePhases;
+global String sampleType;
+
+ rule "Presence [M+CH3COO]-"
+ when
+     $adduct: FoundAdduct(adductName == "[M+CH3COO]-")
+     $phase1 : MobilePhases() from mobilePhases
+     eval($phase1 == MobilePhases.CH3COO)
+      eval(sampleType.equalsIgnoreCase("PLASMA"))
+ then
+     
+     lipid.setScore(1);
+     lipid.setDescrCorrect("Contains [M+CH3COO]-, ");
+     lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+ end
+  rule "No presence [M+CH3COO]-"
+  when
+      not FoundAdduct(adductName == "[M+CH3COO]-")
+      $phase1 : MobilePhases() from mobilePhases
+      eval($phase1 == MobilePhases.CH3COO)
+       eval(sampleType.equalsIgnoreCase("PLASMA"))
+  then
+
+      lipid.setScore(-1);
+      lipid.setDescrIncorrect("Missing [M+CH3COO]-, ");
+      lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+  end
+
+ rule "Presence [M+HCOO]-"
+ when
+     $adduct: FoundAdduct(adductName == "[M+HCOO]-")
+     $phase1 : MobilePhases() from mobilePhases
+     eval($phase1 == MobilePhases.HCOO)
+      eval(sampleType.equalsIgnoreCase("PLASMA"))
+ then
+     
+     lipid.setScore(1);
+     lipid.setDescrCorrect("Contains [M+HCOO]-, ");
+     lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+ end
+
+rule "Presence [M+Cl]-"
+ when
+     $adduct: FoundAdduct(adductName == "[M+Cl]-")
+      eval(sampleType.equalsIgnoreCase("PLASMA"))
+ then
+     
+     lipid.setScore(1);
+     lipid.setDescrCorrect("Contains [M+Cl]-, ");
+     lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+ end
+
+
+
+
+rule "Intensity [M+CH3COO]- > [M+Cl]-"
+when
+    $adduct1: FoundAdduct(adductName == "[M+CH3COO]-")
+    $adduct2: FoundAdduct(adductName == "[M+Cl]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M+CH3COO]- > [M+Cl]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Intensity [M+Cl]- > [M+HCOO]-"
+when
+    $adduct1: FoundAdduct(adductName == "[M+Cl]-")
+    $adduct2: FoundAdduct(adductName == "[M+HCOO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M+CH3COO]- > [M+HCOO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Intensity [M+CH3COO]- < [M+Cl]-"
+when
+    $adduct1: FoundAdduct(adductName == "[M+CH3COO]-")
+    $adduct2: FoundAdduct(adductName == "[M+Cl]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+    eval($adduct1.getIntensity() < $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+CH3COO]- < [M+Cl]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Intensity [M+Cl]- < [M+HCOO]-"
+when
+    $adduct1: FoundAdduct(adductName == "[M+Cl]-")
+    $adduct2: FoundAdduct(adductName == "[M+HCOO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+CH3COO]- < [M+HCOO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Intensity [M+CH3COO]- < [M+HCOO]-"
+when
+    $adduct1: FoundAdduct(adductName == "[M+HCOO]-")
+    $adduct2: FoundAdduct(adductName == "[M+CH3COO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+    $phase2 : MobilePhases() from mobilePhases
+    eval($phase2 == MobilePhases.CH3COO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+HCOO]- > [M+CH3COO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
