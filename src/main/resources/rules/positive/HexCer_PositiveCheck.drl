@@ -1,0 +1,129 @@
+package rules_id_lipid_expert_knowledge.positive;
+
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
+import ceu.biolab.cmm.shared.domain.MobilePhases;
+import java.util.List;
+
+// Declare the global list
+global AnnotatedFeature lipid;
+global List mobilePhases;
+global String sampleType;
+
+
+rule "HexCer_PositiveCheck - Presence [M+H]+"
+when
+    $adduct: ResultItem(adductName == "[M+H]+")
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M+H]+, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+rule "HexCer_PositiveCheck - No presence [M+H]+"
+when
+    not ResultItem(adductName == "[M+H]+")
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(-1);
+    lipid.setDescrIncorrect("Missing [M+H]+, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+rule "HexCer_PositiveCheck - Presence [M+Na]+"
+when
+    $adduct: ResultItem(adductName == "[M+Na]+")
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M+Na]+, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+rule "HexCer_PositiveCheck - Presence [M+K]+"
+when
+    $adduct: ResultItem(adductName == "[M+K]+")
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M+K]+, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+rule "HexCer_PositiveCheck - Presence [M+H-H2O]+"
+when
+    $adduct: ResultItem(adductName == "[M+H-H2O]+")
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M+H-H2O]+, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+
+
+
+rule "HexCer_PositiveCheck - Intensity [M+H]+ > [M+Na]+"
+when
+    $adduct1: ResultItem(adductName == "[M+H]+")
+    $adduct2: ResultItem(adductName == "[M+Na]+")
+
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M+H]+ > [M+Na]+, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "HexCer_PositiveCheck - Intensity [M+Na]+ > [M+K]+"
+when
+    $adduct1: ResultItem(adductName == "[M+Na]+")
+    $adduct2: ResultItem(adductName == "[M+K]+")
+
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M+Na]+ > [M+K]+, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "HexCer_PositiveCheck - Intensity [M+H]+ < [M+Na]+"
+when
+    $adduct1: ResultItem(adductName == "[M+H]+")
+    $adduct2: ResultItem(adductName == "[M+Na]+")
+
+    eval($adduct1.getIntensity() < $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+H]+ < [M+Na]+, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "HexCer_PositiveCheck - Intensity [M+Na]+ < [M+K]+"
+when
+    $adduct1: ResultItem(adductName == "[M+Na]+")
+    $adduct2: ResultItem(adductName == "[M+K]+")
+
+    eval($adduct1.getIntensity() < $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+Na]+ < [M+K]+, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "HexCer_PositiveCheck - Intensity [M+H]+ < [M+K]+"
+when
+    $adduct1: ResultItem(adductName == "[M+K]+")
+    $adduct2: ResultItem(adductName == "[M+H]+")
+
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+K]+ > [M+H]+, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end

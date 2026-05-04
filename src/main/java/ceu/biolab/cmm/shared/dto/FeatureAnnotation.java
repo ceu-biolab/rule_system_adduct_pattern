@@ -1,6 +1,8 @@
 package ceu.biolab.cmm.shared.dto;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -15,6 +17,71 @@ public class FeatureAnnotation {
         @NotEmpty
         @Valid
         private Set<ResultItem> items = new LinkedHashSet<>();
+
+        private List<ResultItem> listAdducts = new ArrayList<>();
+        private int score;
+        private String descrCorrect = "";
+        private String descrIncorrect = "";
+        private int appliedPresence;
+        private int appliedIntensity;
+
+        public List<ResultItem> getListAdducts() {
+            return listAdducts;
+        }
+
+        public void setListAdducts(List<ResultItem> listAdducts) {
+            this.listAdducts = listAdducts == null ? new ArrayList<>() : new ArrayList<>(listAdducts);
+            this.items = new LinkedHashSet<>(this.listAdducts);
+        }
+
+        public int getScore() {
+            return score;
+        }
+
+        public void setScore(int score) {
+            this.score = score;
+        }
+
+        public String getDescrCorrect() {
+            return descrCorrect;
+        }
+
+        public void setDescrCorrect(String descrCorrect) {
+            this.descrCorrect = this.descrCorrect + descrCorrect;
+        }
+
+        public String getDescrIncorrect() {
+            return descrIncorrect;
+        }
+
+        public void setDescrIncorrect(String descrIncorrect) {
+            this.descrIncorrect = this.descrIncorrect + descrIncorrect;
+        }
+
+        public int getAppliedPresence() {
+            return appliedPresence;
+        }
+
+        public void setAppliedPresence(int appliedPresence) {
+            this.appliedPresence = appliedPresence;
+        }
+
+        public int getAppliedIntensity() {
+            return appliedIntensity;
+        }
+
+        public void setAppliedIntensity(int appliedIntensity) {
+            this.appliedIntensity = appliedIntensity;
+        }
+
+        public Set<ResultItem> getItems() {
+            return items;
+        }
+
+        public void setItems(Set<ResultItem> items) {
+            this.items = items == null ? new LinkedHashSet<>() : new LinkedHashSet<>(items);
+            this.listAdducts = new ArrayList<>(this.items);
+        }
     }
 
     @Data
@@ -33,5 +100,13 @@ public class FeatureAnnotation {
 
         @JsonProperty("adduct")
         private String adduct;
+
+        public String getAdductName() {
+            return adduct;
+        }
+
+        public void setAdductName(String adductName) {
+            this.adduct = adductName;
+        }
     }
 }

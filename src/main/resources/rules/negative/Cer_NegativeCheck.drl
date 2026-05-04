@@ -1,0 +1,210 @@
+package rules_id_lipid_expert_knowledge.negative;
+
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
+import ceu.biolab.cmm.shared.domain.MobilePhases;
+ 
+import java.util.List;
+
+// Declare the global list
+global AnnotatedFeature lipid;
+global List mobilePhases;
+global String sampleType;
+
+rule "Cer_NegativeCheck - Presence [M-H]-"
+when
+    $adduct: ResultItem(adductName == "[M-H]-")
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M-H]-, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+rule "Cer_NegativeCheck - No presence [M+CH3COO]-"
+when
+    not ResultItem(adductName == "[M+CH3COO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(-1);
+    lipid.setDescrIncorrect("Missing [M+CH3COO]-, ");
+    List<ResultItem> adducts = lipid.getListAdducts();
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+rule "Cer_NegativeCheck - Presence [M+CH3COO]-"
+when
+    $adduct: ResultItem(adductName == "[M+CH3COO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M+CH3COO]-, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+rule "Cer_NegativeCheck - Presence [M+HCOO]-"
+when
+    $adduct: ResultItem(adductName == "[M+HCOO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M+HCOO]-, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+rule "Cer_NegativeCheck - Presence [M+Cl]-"
+when
+    $adduct: ResultItem(adductName == "[M+Cl]-")
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(1);
+    lipid.setDescrCorrect("Contains [M+Cl]-, ");
+    lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
+end
+
+
+
+
+rule "Cer_NegativeCheck - Intensity [M+CH3COO]- > [M-H]-"
+when
+    $adduct1: ResultItem(adductName == "[M+CH3COO]-")
+    $adduct2: ResultItem(adductName == "[M-H]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M+CH3COO]- > [M-H]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Cer_NegativeCheck - Intensity [M+CH3COO]- > [M+Cl]-"
+when
+    $adduct1: ResultItem(adductName == "[M+CH3COO]-")
+    $adduct2: ResultItem(adductName == "[M+Cl]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M+CH3COO]- > [M+Cl]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Cer_NegativeCheck - Intensity [M-H]- > [M+HCOO]-"
+when
+    $adduct1: ResultItem(adductName == "[M-H]-")
+    $adduct2: ResultItem(adductName == "[M+HCOO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M-H]- > [M+HCOO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Cer_NegativeCheck - Intensity [M+Cl]- > [M+HCOO]-"
+when
+    $adduct1: ResultItem(adductName == "[M+Cl]-")
+    $adduct2: ResultItem(adductName == "[M+HCOO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(2);
+    lipid.setDescrCorrect("Intensity OK [M+Cl]- > [M+HCOO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+
+rule "Cer_NegativeCheck - Intensity [M+CH3COO]- < [M-H]-"
+when
+    $adduct1: ResultItem(adductName == "[M+CH3COO]-")
+    $adduct2: ResultItem(adductName == "[M-H]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+    eval($adduct1.getIntensity() < $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+CH3COO]- < [M-H]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Cer_NegativeCheck - Intensity [M+CH3COO]- < [M+Cl]-"
+when
+    $adduct1: ResultItem(adductName == "[M+CH3COO]-")
+    $adduct2: ResultItem(adductName == "[M+Cl]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+    eval($adduct1.getIntensity() < $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+CH3COO]- < [M+Cl]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Cer_NegativeCheck - Intensity [M-H]- < [M+HCOO]-"
+when
+    $adduct1: ResultItem(adductName == "[M-H]-")
+    $adduct2: ResultItem(adductName == "[M+HCOO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+    eval($adduct1.getIntensity() < $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M-H]- < [M+HCOO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Cer_NegativeCheck - Intensity [M+Cl]- < [M+HCOO]-"
+when
+    $adduct1: ResultItem(adductName == "[M+Cl]-")
+    $adduct2: ResultItem(adductName == "[M+HCOO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.HCOO)
+    eval($adduct1.getIntensity() < $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+    
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+Cl]- < [M+HCOO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
+
+rule "Cer_NegativeCheck - Intensity [M+CH3COO]- < [M+HCOO]-"
+when
+    $adduct1: ResultItem(adductName == "[M+HCOO]-")
+    $adduct2: ResultItem(adductName == "[M+CH3COO]-")
+    $phase1 : MobilePhases() from mobilePhases
+    eval($phase1 == MobilePhases.CH3COO)
+    $phase2 : MobilePhases() from mobilePhases
+    eval($phase2 == MobilePhases.HCOO)
+    eval($adduct1.getIntensity() > $adduct2.getIntensity())
+     eval(sampleType.equalsIgnoreCase("PLASMA"))
+then
+
+    lipid.setScore(-2);
+    lipid.setDescrIncorrect("Intensity NOT OK [M+HCOO]- > [M+CH3COO]-, ");
+    lipid.setAppliedIntensity(lipid.getAppliedIntensity() + 1);
+end
