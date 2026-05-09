@@ -1,8 +1,5 @@
 package ceu.biolab.cmm.rulePuntuation.dto;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 public class RulePuntuationResponseDTO {
 
-    private List<ScoredFeature> results = new ArrayList<>();
+    private ScoredFeature bestResult;
 
     @Data
     @NoArgsConstructor

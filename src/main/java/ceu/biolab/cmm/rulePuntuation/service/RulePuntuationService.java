@@ -51,18 +51,23 @@ public class RulePuntuationService {
         logger.info("Scoring {} candidate annotations with rule prefix '{}'",
                 annotationResult.getResults().size(), rulePrefix);
 
-        RulePuntuationResponseDTO response = new RulePuntuationResponseDTO();
+        RulePuntuationResponseDTO.ScoredFeature best = null;
         for (FeatureAnnotation.AnnotatedFeature feature : annotationResult.getResults()) {
             applyRules(feature, request.getMobilePhases(), rulePrefix);
-            response.getResults().add(new RulePuntuationResponseDTO.ScoredFeature(
+            RulePuntuationResponseDTO.ScoredFeature candidate = new RulePuntuationResponseDTO.ScoredFeature(
                     feature,
                     feature.getScore(),
                     feature.getDescrCorrect(),
                     feature.getDescrIncorrect(),
                     feature.getAppliedPresence(),
-                    feature.getAppliedIntensity()));
+                    feature.getAppliedIntensity());
+            if (best == null || candidate.getScore() > best.getScore()) {
+                best = candidate;
+            }
         }
 
+        RulePuntuationResponseDTO response = new RulePuntuationResponseDTO();
+        response.setBestResult(best);
         return response;
     }
 
