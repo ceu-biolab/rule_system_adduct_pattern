@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,11 +13,11 @@ import org.junit.jupiter.api.Test;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
-import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
 import ceu.biolab.cmm.shared.domain.adduct.AdductCatalog;
 import ceu.biolab.cmm.shared.domain.adduct.AdductDefinition;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
 class FeatureAnnotationLogicTest {
     private static final double PROTON_MASS = 1.007276;
@@ -63,8 +62,8 @@ class FeatureAnnotationLogicTest {
             Optional<FeatureAnnotation.ResultItem> naItem = findItem(group, sodiumMz);
             return hItem.isPresent()
                     && naItem.isPresent()
-                    && "[M+H]+".equals(hItem.get().getAdduct())
-                    && "[M+Na]+".equals(naItem.get().getAdduct());
+                    && "[M+H]+".equals(hItem.get().getAdductName())
+                    && "[M+Na]+".equals(naItem.get().getAdductName());
         });
 
         assertTrue(found);
@@ -95,8 +94,7 @@ class FeatureAnnotationLogicTest {
         hypothesis.getItems().add(buildResultItem(350.0, null));
         hypothesis.getItems().add(buildResultItem(400.0, null));
 
-        List<FeatureAnnotation.AnnotatedFeature> filtered =
-                service.filter(List.of(hypothesis), 5);
+        List<FeatureAnnotation.AnnotatedFeature> filtered = service.filter(List.of(hypothesis), 5);
 
         assertEquals(0, filtered.size());
     }
@@ -109,28 +107,26 @@ class FeatureAnnotationLogicTest {
         return input;
     }
 
-    private FeatureAnnotation.ResultItem buildResultItem(double mz, String adduct) {
+    private FeatureAnnotation.ResultItem buildResultItem(double mz, String adductName) {
         FeatureAnnotation.ResultItem item = new FeatureAnnotation.ResultItem();
         item.setMzValue(mz);
         item.setIntensity(100.0);
         item.setRetentionTime(1.0);
-        item.setAdduct(adduct);
+        item.setAdductName(adductName);
         return item;
     }
 
-    private Optional<FeatureAnnotation.ResultItem> findItem(
-            FeatureAnnotation.AnnotatedFeature group,
-            double mz) {
+    private Optional<FeatureAnnotation.ResultItem> findItem(FeatureAnnotation.AnnotatedFeature group, double mz) {
         return group.getItems().stream()
                 .filter(item -> Math.abs(item.getMzValue() - mz) <= 0.0001)
                 .findFirst();
     }
 
     private Object invokeDetectCharge(FeatureAnnotationService service,
-                                          FeatureAnnotationRequestDTO.FeatureInput signal,
-                                          List<FeatureAnnotationRequestDTO.FeatureInput> signals) throws Exception {
+                                      FeatureAnnotationRequestDTO.FeatureInput signal,
+                                      List<FeatureAnnotationRequestDTO.FeatureInput> signals) throws Exception {
         Method method = FeatureAnnotationService.class.getDeclaredMethod("detectCharge",
-                            FeatureAnnotationRequestDTO.FeatureInput.class, List.class);
+                FeatureAnnotationRequestDTO.FeatureInput.class, List.class);
         method.setAccessible(true);
         return method.invoke(service, signal, signals);
     }
@@ -142,12 +138,5 @@ class FeatureAnnotationLogicTest {
                 double.class, AdductDefinition.class);
         method.setAccessible(true);
         return method.invoke(service, mz, adduct);
-    }
-
-    private List<AdductDefinition> setupMockAdducts() {
-        List<AdductDefinition> adducts = new ArrayList<>();
-        adducts.add(AdductCatalog.definitionsFor(IonizationMode.POSITIVE).get("[M+H]+"));
-        adducts.add(AdductCatalog.definitionsFor(IonizationMode.POSITIVE).get("[M+Na]+"));
-        return adducts;
     }
 }

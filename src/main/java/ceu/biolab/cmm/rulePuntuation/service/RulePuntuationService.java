@@ -24,7 +24,6 @@ public class RulePuntuationService {
 
     private static final Logger logger = LoggerFactory.getLogger(RulePuntuationService.class);
 
-    // All current rules guard on this value; kept internal until the DTO exposes it.
     private static final String SAMPLE_TYPE = "PLASMA";
 
     private final KieContainer kieContainer;
@@ -37,12 +36,8 @@ public class RulePuntuationService {
     }
 
     /**
-     * Full punctuation flow:
-     * <ol>
-     *   <li>Delegate annotation to {@link FeatureAnnotationService}.</li>
-     *   <li>Score every candidate annotation with Drools, restricting rules
-     *       to the prefix {@code {ruleTarget}_{Positive|Negative}Check}.</li>
-     * </ol>
+     * Full flow: annotate raw features, then score each candidate against the
+     * Drools rules for the requested lipid class and polarity.
      */
     public RulePuntuationResponseDTO calculatePuntuation(RulePuntuationRequestDTO request) {
         if (request == null) {
@@ -59,33 +54,21 @@ public class RulePuntuationService {
         RulePuntuationResponseDTO response = new RulePuntuationResponseDTO();
         for (FeatureAnnotation.AnnotatedFeature feature : annotationResult.getResults()) {
             applyRules(feature, request.getMobilePhases(), rulePrefix);
-
-            RulePuntuationResponseDTO.ScoredFeature scored = new RulePuntuationResponseDTO.ScoredFeature(
+            response.getResults().add(new RulePuntuationResponseDTO.ScoredFeature(
                     feature,
                     feature.getScore(),
                     feature.getDescrCorrect(),
-                    feature.getDescrIncorrect());
-            response.getResults().add(scored);
+                    feature.getDescrIncorrect(),
+                    feature.getAppliedPresence(),
+                    feature.getAppliedIntensity()));
         }
 
         return response;
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private FeatureAnnotationRequestDTO buildAnnotationRequest(RulePuntuationRequestDTO request) {
-        FeatureAnnotationRequestDTO dto = new FeatureAnnotationRequestDTO();
-        dto.setFeatures(new ArrayList<>(request.getFeatures()));
-        dto.setToleranceMode(request.getTolerance().getMode());
-        return dto;
-    }
-
     /**
-     * Scores a pre-built {@link FeatureAnnotation.AnnotatedFeature} directly against the rules
-     * for the given target and polarity, without going through the annotation step.
-     * Resets all scoring state on {@code feature} before firing rules.
+     * Scores a pre-built feature directly, bypassing the annotation step.
+     * Resets all scoring state before firing rules.
      */
     public int scoreFeature(FeatureAnnotation.AnnotatedFeature feature,
                             List<MobilePhases> mobilePhases,
@@ -96,19 +79,13 @@ public class RulePuntuationService {
         return feature.getScore();
     }
 
-    /**
-     * Runs the Drools session for a single annotated feature.
-     * Only rules whose name starts with {@code rulePrefix} are fired.
-     *
-     * <p>Globals required by every DRL file:
-     * <ul>
-     *   <li>{@code lipid} – the mutable {@link FeatureAnnotation.AnnotatedFeature} being scored</li>
-     *   <li>{@code mobilePhases} – controls phase-dependent adduct rules</li>
-     *   <li>{@code sampleType} – currently always "PLASMA"</li>
-     * </ul>
-     * {@link FeatureAnnotation.ResultItem} objects are inserted as Drools facts so that
-     * presence/intensity conditions can match against them.
-     */
+    private FeatureAnnotationRequestDTO buildAnnotationRequest(RulePuntuationRequestDTO request) {
+        FeatureAnnotationRequestDTO dto = new FeatureAnnotationRequestDTO();
+        dto.setFeatures(new ArrayList<>(request.getFeatures()));
+        dto.setToleranceMode(request.getToleranceMode());
+        return dto;
+    }
+
     private void applyRules(FeatureAnnotation.AnnotatedFeature feature,
                             List<MobilePhases> mobilePhases,
                             String rulePrefix) {
@@ -119,9 +96,7 @@ public class RulePuntuationService {
             session.setGlobal("sampleType", SAMPLE_TYPE);
 
             for (FeatureAnnotation.ResultItem item : feature.getItems()) {
-                if (item != null) {
-                    session.insert(item);
-                }
+                if (item != null) session.insert(item);
             }
 
             int fired = session.fireAllRules(
@@ -133,11 +108,7 @@ public class RulePuntuationService {
         }
     }
 
-    /**
-     * Builds the rule-name prefix used to filter the Drools agenda.
-     * Maps {@code POSITIVE} → "Positive", {@code NEGATIVE} → "Negative"
-     * to match the DRL file naming convention {@code {Class}_{Polarity}Check}.
-     */
+    /** Maps e.g. (PC, POSITIVE) → "PC_PositiveCheck" to match DRL file naming. */
     private String buildRulePrefix(RuleTarget target, IonizationMode mode) {
         String polarity = mode.name().charAt(0) + mode.name().substring(1).toLowerCase();
         return target.getDrlPrefix() + "_" + polarity + "Check";

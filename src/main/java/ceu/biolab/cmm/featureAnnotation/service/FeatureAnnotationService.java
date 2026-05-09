@@ -108,7 +108,7 @@ public class FeatureAnnotationService {
             return 0;
         }
         return result.getItems().stream()
-                .filter(item -> item != null && item.getAdduct() != null)
+                .filter(item -> item != null && item.getAdductName() != null)
                 .count();
     }
 
@@ -152,7 +152,7 @@ public class FeatureAnnotationService {
      * @return signature component
      */
     private String signaturePart(FeatureAnnotation.ResultItem item) {
-        String adduct = item.getAdduct() == null ? "" : item.getAdduct();
+        String adduct = item.getAdductName() == null ? "" : item.getAdductName();
         return item.getMzValue() + ":" + item.getIntensity() + ":" + item.getRetentionTime() + ":" + adduct;
     }
 
@@ -374,7 +374,7 @@ public class FeatureAnnotationService {
         item.setMzValue(input.getMzValue());
         item.setIntensity(input.getIntensity());
         item.setRetentionTime(input.getRetentionTime());
-        item.setAdduct(adduct);
+        item.setAdductName(adduct);
         return item;
     }
 }

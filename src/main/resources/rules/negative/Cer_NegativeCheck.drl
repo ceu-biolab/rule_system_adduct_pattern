@@ -3,7 +3,6 @@ package rules_id_lipid_expert_knowledge.negative;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
 import ceu.biolab.cmm.shared.domain.MobilePhases;
- 
 import java.util.List;
 
 // Declare the global list
@@ -29,7 +28,6 @@ when
 then
     lipid.setScore(-1);
     lipid.setDescrIncorrect("Missing [M+CH3COO]-, ");
-    List<ResultItem> adducts = lipid.getListAdducts();
     lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
 end
 

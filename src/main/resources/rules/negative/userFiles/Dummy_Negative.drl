@@ -50,7 +50,6 @@ when
 then
     lipid.setScore(-1);
     lipid.setDescrIncorrect("Missing [M+CH3COO]-, ");
-    List<ResultItem> adducts = lipid.getListAdducts();
     lipid.setAppliedPresence(lipid.getAppliedPresence() + 1);
 end
 
