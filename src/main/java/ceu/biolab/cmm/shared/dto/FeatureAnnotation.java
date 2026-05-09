@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -25,6 +26,7 @@ public class FeatureAnnotation {
         private int appliedPresence;
         private int appliedIntensity;
 
+        @JsonIgnore
         public List<ResultItem> getListAdducts() {
             return listAdducts;
         }
@@ -34,6 +36,7 @@ public class FeatureAnnotation {
             this.items = new LinkedHashSet<>(this.listAdducts);
         }
 
+        @JsonIgnore
         public int getScore() {
             return score;
         }
@@ -52,6 +55,7 @@ public class FeatureAnnotation {
             this.appliedIntensity = 0;
         }
 
+        @JsonIgnore
         public String getDescrCorrect() {
             return descrCorrect;
         }
@@ -60,6 +64,7 @@ public class FeatureAnnotation {
             this.descrCorrect = this.descrCorrect + descrCorrect;
         }
 
+        @JsonIgnore
         public String getDescrIncorrect() {
             return descrIncorrect;
         }

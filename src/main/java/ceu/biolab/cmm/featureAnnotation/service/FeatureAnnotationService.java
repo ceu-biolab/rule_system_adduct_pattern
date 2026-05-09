@@ -191,7 +191,7 @@ public class FeatureAnnotationService {
 
         double theoreticalMass = calculateTheoreticalMass(sourceSignal.getMzValue(), sourceAdduct);
         FeatureAnnotation.AnnotatedFeature group = new FeatureAnnotation.AnnotatedFeature();
-        group.getItems().addAll(buildGroupItems(signals, theoreticalMass, adducts, toleranceMode, sourceSignal, sourceAdduct));
+        group.setItems(new java.util.LinkedHashSet<>(buildGroupItems(signals, theoreticalMass, adducts, toleranceMode, sourceSignal, sourceAdduct)));
         return group;
     }
 
