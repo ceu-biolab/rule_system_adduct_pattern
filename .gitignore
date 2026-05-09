@@ -9,3 +9,5 @@ mykeystore.jks
 .venv/
 DEPLOYMENT.md
 __temp
+batch_search_requests/
+mz_values.csv

@@ -1,0 +1,192 @@
+package ceu.biolab.cmm.rulePuntuation;
+
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.kie.api.runtime.KieContainer;
+
+import ceu.biolab.cmm.config.DroolsConfig;
+import ceu.biolab.cmm.rulePuntuation.service.RulePuntuationService;
+import ceu.biolab.cmm.shared.domain.IonizationMode;
+import ceu.biolab.cmm.shared.domain.MobilePhases;
+import ceu.biolab.cmm.shared.domain.RuleTarget;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
+
+/**
+ * Verifies that the Drools scoring rules correctly rank a feature higher when
+ * scored against the lipid class that matches its actual adduct pattern than
+ * when scored against a different class.
+ *
+ * No Spring context needed: KieContainer is built from DroolsConfig directly,
+ * and scoreFeature bypasses the featureAnnotation step.
+ */
+class RulePuntuationServiceTest {
+
+    private static RulePuntuationService service;
+
+    @BeforeAll
+    static void buildService() throws IOException {
+        KieContainer kieContainer = new DroolsConfig().kieContainer();
+        // featureAnnotationService is unused by scoreFeature
+        service = new RulePuntuationService(kieContainer, null);
+    }
+
+    // -------------------------------------------------------------------------
+    // Positive-mode tests
+    // -------------------------------------------------------------------------
+
+    /**
+     * DG positive pattern: Na > H > K, [M+H-H2O]+ present.
+     * Expected: DG score > PC score.
+     */
+    @Test
+    void dgPositivePattern_dgScoresHigherThanPc() {
+        AnnotatedFeature feature = feature(
+                item("[M+Na]+",     1000.0),
+                item("[M+H]+",       500.0),
+                item("[M+K]+",       200.0),
+                item("[M+H-H2O]+",   300.0)
+        );
+        List<MobilePhases> phases = List.of(MobilePhases.CH3COO);
+
+        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.POSITIVE);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
+
+        assertAll(
+                () -> assertTrue(dgScore > pcScore,
+                        "DG feature: DG score (%d) should beat PC score (%d)".formatted(dgScore, pcScore))
+        );
+    }
+
+    /**
+     * PC positive pattern: H > Na > K.
+     * Expected: PC score > DG score.
+     */
+    @Test
+    void pcPositivePattern_pcScoresHigherThanDg() {
+        AnnotatedFeature feature = feature(
+                item("[M+H]+",  1000.0),
+                item("[M+Na]+",  500.0),
+                item("[M+K]+",   100.0)
+        );
+        List<MobilePhases> phases = List.of(MobilePhases.CH3COO);
+
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
+        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.POSITIVE);
+
+        assertAll(
+                () -> assertTrue(pcScore > dgScore,
+                        "PC feature: PC score (%d) should beat DG score (%d)".formatted(pcScore, dgScore))
+        );
+    }
+
+    /**
+     * CE positive pattern: Na > K > H, diagnostic [C27H44]+ present.
+     * Expected: CE score > PC score.
+     */
+    @Test
+    void cePositivePattern_ceScoresHigherThanPc() {
+        AnnotatedFeature feature = feature(
+                item("[M+Na]+",   1000.0),
+                item("[M+K]+",     700.0),
+                item("[C27H44]+",  500.0),
+                item("[M+H]+",     200.0)
+        );
+        List<MobilePhases> phases = List.of(MobilePhases.CH3COO);
+
+        int ceScore = service.scoreFeature(feature, phases, RuleTarget.CE, IonizationMode.POSITIVE);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
+
+        assertAll(
+                () -> assertTrue(ceScore > pcScore,
+                        "CE feature: CE score (%d) should beat PC score (%d)".formatted(ceScore, pcScore))
+        );
+    }
+
+    /**
+     * TG positive pattern with NH4/CH3CN/CH3OH phases:
+     * C2H7N2 > NH4 > Na > K > H.
+     * Expected: TG score > PC score.
+     */
+    @Test
+    void tgPositiveWithNH4Phases_tgScoresHigherThanPc() {
+        AnnotatedFeature feature = feature(
+                item("[M+C2H7N2]+", 1200.0),
+                item("[M+NH4]+",    1000.0),
+                item("[M+Na]+",      500.0),
+                item("[M+K]+",       200.0),
+                item("[M+H]+",       100.0)
+        );
+        List<MobilePhases> phases = List.of(
+                MobilePhases.NH4, MobilePhases.CH3CN, MobilePhases.CH3OH);
+
+        int tgScore = service.scoreFeature(feature, phases, RuleTarget.TG, IonizationMode.POSITIVE);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
+
+        assertAll(
+                () -> assertTrue(tgScore > pcScore,
+                        "TG feature: TG score (%d) should beat PC score (%d)".formatted(tgScore, pcScore))
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Negative-mode test
+    // -------------------------------------------------------------------------
+
+    /**
+     * PC negative pattern: decreasing CH3COO adduct cluster
+     * [M+CH3COO]- > [M+CH3COO+(CH3COONa)]- > ... > [M+Cl]-
+     * Expected: PC_NEG score > DG_NEG score.
+     */
+    @Test
+    void pcNegativePattern_pcScoresHigherThanDg() {
+        AnnotatedFeature feature = feature(
+                item("[M+CH3COO]-",                1000.0),
+                item("[M+CH3COO+(CH3COONa)]-",      500.0),
+                item("[M+CH3COO+(CH3COONa)2]-",     200.0),
+                item("[M+CH3COO+(CH3COONa)3]-",     100.0),
+                item("[M+Cl]-",                      50.0)
+        );
+        List<MobilePhases> phases = List.of(MobilePhases.CH3COO, MobilePhases.HCOO);
+
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.NEGATIVE);
+        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.NEGATIVE);
+
+        assertAll(
+                () -> assertTrue(pcScore > dgScore,
+                        "PC-NEG feature: PC score (%d) should beat DG score (%d)".formatted(pcScore, dgScore))
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private static ResultItem item(String adduct, double intensity) {
+        ResultItem item = new ResultItem();
+        item.setMzValue(500.0);
+        item.setRetentionTime(1.0);
+        item.setIntensity(intensity);
+        item.setAdductName(adduct);
+        return item;
+    }
+
+    private static AnnotatedFeature feature(ResultItem... items) {
+        AnnotatedFeature feature = new AnnotatedFeature();
+        Set<ResultItem> set = new LinkedHashSet<>();
+        for (ResultItem item : items) {
+            set.add(item);
+        }
+        feature.setItems(set);
+        return feature;
+    }
+}

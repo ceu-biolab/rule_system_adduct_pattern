@@ -38,8 +38,18 @@ public class FeatureAnnotation {
             return score;
         }
 
-        public void setScore(int score) {
-            this.score = score;
+        /** Adds {@code delta} to the running score (accumulates like setDescrCorrect). */
+        public void setScore(int delta) {
+            this.score += delta;
+        }
+
+        /** Resets all scoring state so the same feature can be re-scored with a different target. */
+        public void reset() {
+            this.score = 0;
+            this.descrCorrect = "";
+            this.descrIncorrect = "";
+            this.appliedPresence = 0;
+            this.appliedIntensity = 0;
         }
 
         public String getDescrCorrect() {
