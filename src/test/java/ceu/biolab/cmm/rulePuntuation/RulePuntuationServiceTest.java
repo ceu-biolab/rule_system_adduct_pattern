@@ -3,7 +3,6 @@ package ceu.biolab.cmm.rulePuntuation;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -34,7 +33,7 @@ class RulePuntuationServiceTest {
     private static RulePuntuationService service;
 
     @BeforeAll
-    static void buildService() throws IOException {
+    static void buildService() {
         KieContainer kieContainer = new DroolsConfig().kieContainer();
         // featureAnnotationService is unused by scoreFeature
         service = new RulePuntuationService(kieContainer, null);

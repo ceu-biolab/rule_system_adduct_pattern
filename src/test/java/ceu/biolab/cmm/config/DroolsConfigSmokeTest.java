@@ -3,7 +3,6 @@ package ceu.biolab.cmm.config;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +18,7 @@ import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
 class DroolsConfigSmokeTest {
 
     @Test
-    void loadsAndFiresAllRulesWithoutCompilationErrors() throws IOException {
+    void loadsAndFiresAllRulesWithoutCompilationErrors() {
         KieContainer kieContainer = new DroolsConfig().kieContainer();
         FeatureAnnotation.AnnotatedFeature lipid = new FeatureAnnotation.AnnotatedFeature();
         List<MobilePhases> mobilePhases = new ArrayList<>(List.of(MobilePhases.values()));
