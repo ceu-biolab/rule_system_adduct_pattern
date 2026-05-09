@@ -29,7 +29,10 @@ public class DroolsConfig {
             org.kie.api.io.Resource kieResource = kieServices.getResources()
                 .newInputStreamResource(rule.getInputStream());
             kieResource.setResourceType(ResourceType.DRL);
-            kieResource.setSourcePath("rules/" + rule.getFilename());
+            String uri = rule.getURI().toString();
+            int idx = uri.lastIndexOf("/rules/");
+            String sourcePath = idx >= 0 ? uri.substring(idx + 1) : "rules/" + rule.getFilename();
+            kieResource.setSourcePath(sourcePath);
             kieFileSystem.write(kieResource);
         }
 

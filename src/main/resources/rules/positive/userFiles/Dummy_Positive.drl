@@ -1,6 +1,6 @@
 //Dummy example for positive polarity rule file
 
-package rules_id_lipid_expert_knowledge.positive.userFiles;
+package rules.positive.userFiles;
 
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;

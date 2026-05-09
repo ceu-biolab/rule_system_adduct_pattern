@@ -1,4 +1,4 @@
-package rules_id_lipid_expert_knowledge.positive;
+package rules.positive;
 
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
