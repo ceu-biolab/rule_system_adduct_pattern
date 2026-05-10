@@ -93,13 +93,13 @@ ResultItem                               — one signal within a hypothesis
 
 ```
 RulePuntuationResponseDTO
-  results        List<ScoredFeature>
+  bestResult     ScoredFeature         — highest-scoring annotation hypothesis
 
 ScoredFeature
-  annotatedFeature  AnnotatedFeature    — signal set with adduct assignments
-  score             int                 — final accumulated score
-  descrCorrect      String              — reasons for positive score
-  descrIncorrect    String              — reasons for negative score
+  annotatedFeature  AnnotatedFeature   — signal set with adduct assignments
+  score             int                — final accumulated score
+  descrCorrect      String             — reasons for positive score
+  descrIncorrect    String             — reasons for negative score
   appliedPresence   int
   appliedIntensity  int
 ```
@@ -154,24 +154,33 @@ Remaining hypotheses are then **deduplicated**: two hypotheses with identical `(
 
 ## Rule Punctuation
 
-### DRL File Selection
+### Rule Source — Excel Decision Table
 
-Rule files follow the naming convention:
+All rules live in a single Excel workbook:
 
 ```
-{LipidClass}_{Polarity}Check.drl
+src/main/resources/rules/AdductRules.drl.xlsx
 ```
 
-Examples: `PC_PositiveCheck.drl`, `Cer_NegativeCheck.drl`, `TG_PositiveCheck.drl`
+This is a **Drools Decision Table** (DTABLE format). At startup `DroolsConfig` loads the workbook directly — there is no DRL scanning. The individual `.drl` files under `rules/positive/` and `rules/negative/` are kept as reference and can be re-generated from the Excel via the conversion script at `src/main/resources/convertDRLtoExcel/gen_decision_table.py`.
 
-The service builds a prefix from the request:
+### Rule Selection Within the Session
+
+Rules inside the workbook follow the naming convention:
+
+```
+{LipidClass}_{Polarity}Check - <rule description>
+```
+
+Examples: `PC_PositiveCheck - Presence [M+H]+`, `Cer_NegativeCheck - Intensity [M+CH3COO]- > [M-H]-`
+
+The service builds a prefix from the request and passes an `AgendaFilter` so only rules for the requested lipid class and polarity fire:
 
 ```java
 String polarity = mode.name().charAt(0) + mode.name().substring(1).toLowerCase(); // "Positive" / "Negative"
 String prefix   = target.getDrlPrefix() + "_" + polarity + "Check";               // e.g. "PC_PositiveCheck"
+session.fireAllRules(match -> match.getRule().getName().startsWith(prefix));
 ```
-
-Drools `fireAllRules` is then filtered so only rules whose name starts with that prefix are executed. This means a single Drools session holds all rules from all lipid classes, and the prefix acts as a selector.
 
 ### Drools Session Setup
 
@@ -247,6 +256,8 @@ score < 0   — pattern contradicts expectations for this lipid class
 
 `appliedPresence` and `appliedIntensity` count how many rules of each type actually fired, allowing downstream consumers to normalise the score.
 
+After scoring all annotation hypotheses, the service returns only the **single highest-scoring** one as `bestResult`. If all candidates score equally (e.g. all zero), the first one encountered is returned.
+
 ---
 
 ## Supported Lipid Classes
@@ -280,9 +291,11 @@ ceu.biolab.cmm
 
 src/main/resources/
 ├── adducts/              CSV adduct catalogs (positive / negative)
+├── convertDRLtoExcel/    gen_decision_table.py — converts .drl files → AdductRules.drl.xlsx
 └── rules/
-    ├── positive/         {LipidClass}_PositiveCheck.drl  (18 files)
+    ├── AdductRules.drl.xlsx   ← single Drools Decision Table loaded at startup
+    ├── positive/         {LipidClass}_PositiveCheck.drl  (18 reference files)
     │   └── userFiles/    user-editable drafts
-    └── negative/         {LipidClass}_NegativeCheck.drl  (15 files)
+    └── negative/         {LipidClass}_NegativeCheck.drl  (15 reference files)
         └── userFiles/    user-editable drafts
 ```

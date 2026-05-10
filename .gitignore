@@ -2,6 +2,8 @@ target/
 .idea/
 .vscode/
 .smarttomcat/
+.claude/
+.venv/
 *.iml
 *.~lock.*
 application-local.yml
