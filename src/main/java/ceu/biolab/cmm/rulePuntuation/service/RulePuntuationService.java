@@ -36,8 +36,11 @@ public class RulePuntuationService {
     }
 
     /**
-     * Full flow: annotate raw features, then score each candidate against the
-     * Drools rules for the requested lipid class and polarity.
+     * Annotate raw features and score every candidate against the Drools rules
+     * for the requested lipid class and polarity.
+     *
+     * @param request rule punctuation input payload
+     * @return response containing the scored annotation candidates
      */
     public RulePuntuationResponseDTO calculatePuntuation(RulePuntuationRequestDTO request) {
         if (request == null) {
@@ -51,29 +54,32 @@ public class RulePuntuationService {
         logger.info("Scoring {} candidate annotations with rule prefix '{}'",
                 annotationResult.getResults().size(), rulePrefix);
 
-        RulePuntuationResponseDTO.ScoredFeature best = null;
+        List<RulePuntuationResponseDTO.ScoredFeature> scored = new ArrayList<>();
         for (FeatureAnnotation.AnnotatedFeature feature : annotationResult.getResults()) {
             applyRules(feature, request.getMobilePhases(), rulePrefix);
-            RulePuntuationResponseDTO.ScoredFeature candidate = new RulePuntuationResponseDTO.ScoredFeature(
+            scored.add(new RulePuntuationResponseDTO.ScoredFeature(
                     feature,
                     feature.getScore(),
                     feature.getDescrCorrect(),
                     feature.getDescrIncorrect(),
                     feature.getAppliedPresence(),
-                    feature.getAppliedIntensity());
-            if (best == null || candidate.getScore() > best.getScore()) {
-                best = candidate;
-            }
+                    feature.getAppliedIntensity()));
         }
 
         RulePuntuationResponseDTO response = new RulePuntuationResponseDTO();
-        response.setBestResult(best);
+        response.setResults(scored);
         return response;
     }
 
     /**
-     * Scores a pre-built feature directly, bypassing the annotation step.
-     * Resets all scoring state before firing rules.
+     * Score a pre-built feature directly, bypassing the annotation step.
+     * Resets all scoring state on the feature before firing rules.
+     *
+     * @param feature        annotated feature to score
+     * @param mobilePhases   mobile phases present in the sample
+     * @param ruleTarget     lipid class whose rules should be applied
+     * @param ionizationMode polarity used during acquisition
+     * @return accumulated score after all matching rules have fired
      */
     public int scoreFeature(FeatureAnnotation.AnnotatedFeature feature,
                             List<MobilePhases> mobilePhases,
@@ -84,6 +90,13 @@ public class RulePuntuationService {
         return feature.getScore();
     }
 
+    /**
+     * Translate a rule punctuation request into the format expected by the
+     * feature annotation service.
+     *
+     * @param request rule punctuation input payload
+     * @return feature annotation input payload
+     */
     private FeatureAnnotationRequestDTO buildAnnotationRequest(RulePuntuationRequestDTO request) {
         FeatureAnnotationRequestDTO dto = new FeatureAnnotationRequestDTO();
         dto.setFeatures(new ArrayList<>(request.getFeatures()));
@@ -91,6 +104,15 @@ public class RulePuntuationService {
         return dto;
     }
 
+    /**
+     * Open a Drools session, insert the feature's result items as facts, set the
+     * required globals, and fire only the rules whose name starts with the given
+     * prefix.
+     *
+     * @param feature      annotated feature to evaluate
+     * @param mobilePhases mobile phases to expose as a global
+     * @param rulePrefix   agenda filter prefix (e.g. "PC_PositiveCheck")
+     */
     private void applyRules(FeatureAnnotation.AnnotatedFeature feature,
                             List<MobilePhases> mobilePhases,
                             String rulePrefix) {
@@ -113,7 +135,15 @@ public class RulePuntuationService {
         }
     }
 
-    /** Maps e.g. (PC, POSITIVE) → "PC_PositiveCheck" to match DRL file naming. */
+    /**
+     * Derive the rule name prefix from the lipid class and polarity so that only
+     * the relevant rules fire (e.g. {@code RuleTarget.PC} + {@code POSITIVE} →
+     * {@code "PC_PositiveCheck"}).
+     *
+     * @param target lipid class
+     * @param mode   ionization polarity
+     * @return rule name prefix used as the agenda filter
+     */
     private String buildRulePrefix(RuleTarget target, IonizationMode mode) {
         String polarity = mode.name().charAt(0) + mode.name().substring(1).toLowerCase();
         return target.getDrlPrefix() + "_" + polarity + "Check";

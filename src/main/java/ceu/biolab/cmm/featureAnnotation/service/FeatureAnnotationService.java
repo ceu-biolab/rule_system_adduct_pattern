@@ -37,9 +37,17 @@ public class FeatureAnnotationService {
      * @return transformed feature annotation output payload
      */
     public FeatureAnnotationResultDTO transform(FeatureAnnotationRequestDTO input) {
+        
+        //Generate all candidate annotations based on the input features and configured tolerance.
         FeatureAnnotationResultDTO initial = resolveCombinations(input);
+        //Log the total number of input peaks to provide context for the number of generated hypotheses and filtering results.
         int totalInputPeaks = input == null || input.getFeatures() == null ? 0 : input.getFeatures().size();
+        
+        //Filter the initial hypotheses based on match density and remove duplicates, then log the number of results at each step for traceability.
+        LOGGER.info("Generated {} initial hypotheses for {} input peaks", initial.getResults().size(), totalInputPeaks);
         List<FeatureAnnotation.AnnotatedFeature> filtered = filter(new ArrayList<>(initial.getResults()), totalInputPeaks);
+        
+        //Return the filtered results in the output DTO, preserving the original order from the initial annotation step.
         FeatureAnnotationResultDTO output = new FeatureAnnotationResultDTO();
         output.getResults().addAll(filtered);
         return output;
@@ -78,14 +86,21 @@ public class FeatureAnnotationService {
      */
     private FeatureAnnotationResultDTO resolveCombinations(FeatureAnnotationRequestDTO input) {
         FeatureAnnotationResultDTO result = new FeatureAnnotationResultDTO();
+        
         if (input == null || input.getFeatures() == null || input.getFeatures().isEmpty()) {
             return result;
         }
 
         List<FeatureAnnotationRequestDTO.FeatureInput> signals = sortSignals(input.getFeatures());
         List<AdductDefinition> adducts = loadAllAdducts();
+
+        //Iterate over each signal and adduct definition to build hypothesis groups, then filter out empty groups before returning the result.
         for (FeatureAnnotationRequestDTO.FeatureInput signal : signals) {
+            
+            //Get the charge state for the current signal by analyzing isotopic spacing with nearby peaks, which will inform which adducts are plausible for this signal.
             int charge = detectCharge(signal, signals);
+            
+            //For each adduct definition, build a hypothesis group by treating the current signal as the source and looking for matching signals that fit the theoretical mass criteria.
             for (AdductDefinition sourceAdduct : adducts) {
                 FeatureAnnotation.AnnotatedFeature group =
                         buildHypothesisGroup(signal, signals, adducts, input.getToleranceMode(), charge, sourceAdduct);
@@ -104,9 +119,9 @@ public class FeatureAnnotationService {
      * @return number of matches
      */
     private long countMatches(FeatureAnnotation.AnnotatedFeature result) {
-        if (result == null || result.getItems() == null) {
-            return 0;
-        }
+        
+        if (result == null || result.getItems() == null) { return 0;}
+        
         return result.getItems().stream()
                 .filter(item -> item != null && item.getAdductName() != null)
                 .count();
@@ -118,13 +133,15 @@ public class FeatureAnnotationService {
      * @param results filtered hypotheses
      * @return deduplicated hypotheses
      */
-    private List<FeatureAnnotation.AnnotatedFeature> deduplicate(
-            List<FeatureAnnotation.AnnotatedFeature> results) {
+    private List<FeatureAnnotation.AnnotatedFeature> deduplicate(List<FeatureAnnotation.AnnotatedFeature> results) {
+        
         Map<String, FeatureAnnotation.AnnotatedFeature> unique = new LinkedHashMap<>();
+        
         for (FeatureAnnotation.AnnotatedFeature result : results) {
             String signature = buildSignature(result);
             unique.putIfAbsent(signature, result);
         }
+
         return new ArrayList<>(unique.values());
     }
 
@@ -135,9 +152,9 @@ public class FeatureAnnotationService {
      * @return signature string
      */
     private String buildSignature(FeatureAnnotation.AnnotatedFeature result) {
-        if (result == null || result.getItems() == null) {
-            return "";
-        }
+        
+        if (result == null || result.getItems() == null) { return ""; }
+        
         return result.getItems().stream()
                 .filter(item -> item != null)
                 .sorted(Comparator.comparing(this::signaturePart))
@@ -189,6 +206,7 @@ public class FeatureAnnotationService {
             return null;
         }
 
+        //Calculate the theoretical neutral mass for the source signal based on its m/z and the adduct hypothesis, which will be used to find matching signals for other adducts.
         double theoreticalMass = calculateTheoreticalMass(sourceSignal.getMzValue(), sourceAdduct);
         FeatureAnnotation.AnnotatedFeature group = new FeatureAnnotation.AnnotatedFeature();
         group.setItems(new java.util.LinkedHashSet<>(buildGroupItems(signals, theoreticalMass, adducts, toleranceMode, sourceSignal, sourceAdduct)));
@@ -222,7 +240,9 @@ public class FeatureAnnotationService {
             ToleranceMode toleranceMode,
             FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
             AdductDefinition sourceAdduct) {
+        
         List<FeatureAnnotation.ResultItem> items = new ArrayList<>();
+        
         for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
             String adduct = resolveAdductForSignal(candidate, theoreticalMass, adducts, toleranceMode, sourceSignal);
             if (candidate == sourceSignal) {
@@ -297,6 +317,7 @@ public class FeatureAnnotationService {
      */
     private int detectCharge(FeatureAnnotationRequestDTO.FeatureInput signal,
                              List<FeatureAnnotationRequestDTO.FeatureInput> signals) {
+        
         for (int charge = 1; charge <= 3; charge++) {
             double spacing = isotopeSpacingForCharge(charge);
             double expected = signal.getMzValue() + spacing;
@@ -337,7 +358,9 @@ public class FeatureAnnotationService {
      * @return list of allowed adduct definitions
      */
     private List<AdductDefinition> loadAllAdducts() {
+        
         List<AdductDefinition> allowed = new ArrayList<>();
+        
         for (IonizationMode mode : IonizationMode.values()) {
             for (AdductDefinition definition : AdductCatalog.definitionsFor(mode).values()) {
                 allowed.add(definition);
