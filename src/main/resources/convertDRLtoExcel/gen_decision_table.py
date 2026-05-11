@@ -16,9 +16,9 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-DRL_BASE = Path("/mnt/Data/04-Invest/03-RuleSystemAdductPattern/src/main/resources/rules")
-OUTPUT   = Path("/mnt/Data/04-Invest/03-RuleSystemAdductPattern/src/main/resources"
-                "/rules/AdductRules.drl.xlsx")
+_HERE    = Path(__file__).resolve().parent
+DRL_BASE = _HERE.parent / "rules"
+OUTPUT   = _HERE.parent / "rules" / "AdductRules.drl.xlsx"
 
 # ── Regex patterns ──────────────────────────────────────────────────────────
 RULE_RE      = re.compile(r'rule\s+"([^"]+)"\s*\nwhen(.*?)then(.*?)end', re.DOTALL)
