@@ -33,16 +33,10 @@ POST /api/rule-puntuation
         ▼
 RulePuntuationService.calculatePuntuation()
         │
-        ├─► FeatureAnnotationService.transform()
-        │         │
-        │         ├─► detectCharge()          — isotope spacing analysis per signal
-        │         ├─► buildHypothesisGroup()  — neutral mass → brute-force adduct matching
-        │         ├─► filter()                — discard low-coverage hypotheses
-        │         └─► deduplicate()           — remove identical feature/adduct sets
+        ├─► FeatureAnnotationService.transform()   [see Feature Annotation section]
+        │         Returns: List<AnnotatedFeature>
         │
-        │   Returns: List<AnnotatedFeature>
-        │
-        ├─► buildRulePrefix()               — (RuleTarget, IonizationMode) → "PC_PositiveCheck"
+        ├─► buildRulePrefix()     — (RuleTarget, IonizationMode) → "PC_PositiveCheck"
         │
         └─► applyRules()  [per AnnotatedFeature]
                   │
@@ -61,7 +55,7 @@ RulePuntuationService.calculatePuntuation()
 FeatureInput
   mzValue        Double   — measured mass-to-charge
   intensity      Double   — signal intensity
-  retentionTime  Double   — retention time (minutes)
+  retentionTime  Double   — retention time (carried through; not used for filtering)
 
 RulePuntuationRequestDTO
   features       List<FeatureInput>
@@ -76,11 +70,6 @@ RulePuntuationRequestDTO
 ```
 AnnotatedFeature                         — one lipid hypothesis
   items          Set<ResultItem>         — all input signals with assigned adducts
-  score          int                     — accumulated rule score (hidden from JSON; exposed via ScoredFeature)
-  descrCorrect   String                  — concatenated passing rule descriptions
-  descrIncorrect String                  — concatenated failing rule descriptions
-  appliedPresence  int                   — number of presence/absence rules fired
-  appliedIntensity int                   — number of intensity-order rules fired
 
 ResultItem                               — one signal within a hypothesis
   mzValue        Double
@@ -89,11 +78,13 @@ ResultItem                               — one signal within a hypothesis
   adductName     String                  — e.g. "[M+H]+", null if unmatched
 ```
 
+Scoring fields (`score`, `descrCorrect`, `descrIncorrect`, `appliedPresence`, `appliedIntensity`) live on `AnnotatedFeature` internally but are `@JsonIgnore`d; they are exposed only through `ScoredFeature` in the response.
+
 **Rule punctuation response**
 
 ```
 RulePuntuationResponseDTO
-  bestResult     ScoredFeature         — highest-scoring annotation hypothesis
+  results        List<ScoredFeature>
 
 ScoredFeature
   annotatedFeature  AnnotatedFeature   — signal set with adduct assignments
@@ -108,47 +99,60 @@ ScoredFeature
 
 ## Feature Annotation
 
-### Charge Detection
+All input signals are assumed to belong to the same chromatographic feature. No retention-time filtering is applied.
 
-Before matching, each signal is tested for isotopic spacing against all other signals in the same RT window (`|ΔRT| ≤ 0.02 min`). The first charge state whose expected isotope peak is found within `0.01 Da` is used:
+### Step 1 — Sort signals
 
-| Charge (z) | Expected M+1 spacing (m/z) |
+Input signals are sorted by m/z so that matching is deterministic across runs.
+
+### Step 2 — Detect charge per signal
+
+Each signal is checked against all other signals for isotopic spacing to determine its charge state. The first matching charge wins; default is z = 1.
+
+| Charge (z) | Expected M+1 spacing (m/z) | Tolerance |
+|---|---|---|
+| 1 | 1.0033 | ±0.01 Da |
+| 2 | 0.5016 | ±0.01 Da |
+| 3 | 0.3344 | ±0.01 Da |
+
+### Step 3 — Build hypothesis groups (one per signal × adduct)
+
+For every `(sourceSignal, sourceAdduct)` pair where the detected charge matches the adduct's absolute charge, a hypothesis group is built:
+
+```
+1. Compute neutral mass from the source signal:
+      neutralMass = (mz × |z| − offset) / multimer
+
+2. For every other signal, find the best-matching adduct:
+      expectedMz = (neutralMass × multimer + offset) / |z|
+      delta      = |signal.mz − expectedMz|
+      accept if delta ≤ tolerance and delta is the smallest seen so far
+
+3. The source signal is always assigned the source adduct.
+   Other signals get the closest match, or null if nothing fits.
+
+4. All signals (matched or not) are collected into one AnnotatedFeature.
+```
+
+**Tolerance:**
+
+| Mode | Formula |
 |---|---|
-| 1 | 1.0033 |
-| 2 | 0.5016 |
-| 3 | 0.3344 |
+| PPM | `mz × 10 / 1_000_000` |
+| DALTON | `1.0 Da` |
 
-If no isotope peak is detected the signal is treated as singly charged (z = 1). Only adducts with matching absolute charge are tested for a given signal.
+### Step 4 — Filter
 
-### Neutral Mass Calculation
+Hypotheses with too few matched adducts are discarded:
 
-Once a source signal and its charge are known, a neutral mass hypothesis is computed for each adduct definition:
-
-```
-neutralMass = (mz × |z| − offset) / multimer
-```
-
-That mass is then used to predict the expected m/z for every other adduct and checked against the remaining signals.
-
-### Adduct Matching
-
-For each `(sourceSignal, sourceAdduct)` pair a **hypothesis group** is built by iterating all input signals and finding the best-matching adduct within tolerance:
-
-- **PPM mode:** `tolerance = mz × 10 / 1_000_000`
-- **Dalton mode:** `tolerance = 1.0 Da`
-
-The source signal is always assigned the source adduct. Other signals get the closest matching adduct, or `null` if nothing matches.
-
-### Filtering
-
-After all hypotheses are generated, low-coverage ones are discarded:
-
-| Number of input peaks (N) | Minimum matched adducts required |
+| Number of input signals (N) | Minimum matched adducts required |
 |---|---|
 | N ≤ 4 | 2 |
 | N > 4 | 3 |
 
-Remaining hypotheses are then **deduplicated**: two hypotheses with identical `(mz, intensity, rt, adductName)` sets (order-independent) are collapsed into one.
+### Step 5 — Deduplicate
+
+Two hypotheses that produce the same set of `(mz, intensity, rt, adductName)` tuples (order-independent) are collapsed into one.
 
 ---
 
@@ -198,7 +202,7 @@ Each `AnnotatedFeature` gets its own `KieSession`:
 Rules are grouped into four categories. Scores **accumulate** — each rule adds or subtracts from the running total.
 
 **Type 1 — Adduct presence (+1)**
-Fires when a specific adduct is found in the working memory. Optionally guarded by `sampleType` or mobile phase.
+Fires when a specific adduct is found in the working memory.
 ```
 rule "PC_PositiveCheck - Presence [M+H]+"
 when
@@ -209,7 +213,7 @@ then
 ```
 
 **Type 2 — Adduct absence (−1)**
-Fires when an expected adduct is *absent* from working memory (Drools `not` pattern). Typically guarded by the mobile phase that would produce it.
+Fires when an expected adduct is *absent* from working memory (Drools `not` pattern).
 ```
 rule "Cer_NegativeCheck - No presence [M+CH3COO]-"
 when
@@ -220,7 +224,7 @@ then
 ```
 
 **Type 3 — Correct intensity order (+2)**
-Fires when adduct A has higher intensity than adduct B, matching the expected fragmentation pattern.
+Fires when adduct A has higher intensity than adduct B, matching the expected pattern.
 ```
 rule "PC_PositiveCheck - Intensity [M+H]+ > [M+Na]+"
 when
@@ -236,15 +240,13 @@ Fires when the observed intensity order is reversed from what is expected.
 
 ### Mobile Phase Guards
 
-Some adducts only form in specific solvent systems. Rules use the `mobilePhases` global to condition their firing:
+Some adducts only form in specific solvent systems. Rules condition their firing on the `mobilePhases` global:
 
 | Adduct | Required phase |
 |---|---|
 | `[M+CH3COO]-` | `MobilePhases.CH3COO` |
 | `[M+HCOO]-` | `MobilePhases.HCOO` |
 | `[M+C2H7N2]+` | `NH4` + `CH3CN` + `CH3OH` |
-
-A rule for such an adduct pattern will only fire if the matching phase is present in the `mobilePhases` list.
 
 ### Score Interpretation
 
@@ -254,9 +256,7 @@ score = 0   — no matching rules fired (no evidence either way)
 score < 0   — pattern contradicts expectations for this lipid class
 ```
 
-`appliedPresence` and `appliedIntensity` count how many rules of each type actually fired, allowing downstream consumers to normalise the score.
-
-After scoring all annotation hypotheses, the service returns only the **single highest-scoring** one as `bestResult`. If all candidates score equally (e.g. all zero), the first one encountered is returned.
+`appliedPresence` and `appliedIntensity` count how many rules of each type fired, allowing downstream consumers to normalise the score.
 
 ---
 
@@ -287,7 +287,7 @@ ceu.biolab.cmm
 │   ├── domain/           IonizationMode, MobilePhases, RuleTarget, ToleranceMode
 │   └── dto/              FeatureAnnotation (AnnotatedFeature, ResultItem)
 │
-└── config/               DroolsConfig (loads all *.drl at startup)
+└── config/               DroolsConfig (loads AdductRules.drl.xlsx at startup)
 
 src/main/resources/
 ├── adducts/              CSV adduct catalogs (positive / negative)

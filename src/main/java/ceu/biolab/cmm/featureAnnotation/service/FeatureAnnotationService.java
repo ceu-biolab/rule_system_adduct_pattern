@@ -22,11 +22,14 @@ import ceu.biolab.cmm.shared.domain.adduct.AdductDefinition;
 @Service
 public class FeatureAnnotationService {
     private static final Logger LOGGER = LoggerFactory.getLogger(FeatureAnnotationService.class);
+
+    //Constants for isotopic spacing.
     private static final double ISOTOPE_SPACING = 1.0033;
     private static final double HALF_ISOTOPE_SPACING = 0.5016;
     private static final double THIRD_ISOTOPE_SPACING = 0.3344;
+
+    //Tolerance thresholds for matching signals to adduct hypotheses.
     private static final double ISOTOPE_TOLERANCE = 0.01;
-    private static final double RT_TOLERANCE = 0.02;
     private static final double TOLERANCE_PPM = 10.0;
     private static final double TOLERANCE_DALTON = 1.0;
 
@@ -267,9 +270,6 @@ public class FeatureAnnotationService {
                                           List<AdductDefinition> adducts,
                                           ToleranceMode toleranceMode,
                                           FeatureAnnotationRequestDTO.FeatureInput sourceSignal) {
-        if (!isRtCompatible(signal, sourceSignal)) {
-            return null;
-        }
         String bestAdduct = null;
         double bestDelta = Double.POSITIVE_INFINITY;
         for (AdductDefinition adduct : adducts) {
@@ -282,18 +282,6 @@ public class FeatureAnnotationService {
             }
         }
         return bestAdduct;
-    }
-
-    /**
-     * Ensure two signals belong to the same RT window.
-     *
-     * @param candidate candidate signal
-     * @param reference reference signal
-     * @return true when the retention time difference is within tolerance
-     */
-    private boolean isRtCompatible(FeatureAnnotationRequestDTO.FeatureInput candidate,
-                                   FeatureAnnotationRequestDTO.FeatureInput reference) {
-        return Math.abs(candidate.getRetentionTime() - reference.getRetentionTime()) <= RT_TOLERANCE;
     }
 
     /**
@@ -323,9 +311,6 @@ public class FeatureAnnotationService {
             double expected = signal.getMzValue() + spacing;
             for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
                 if (candidate == signal) {
-                    continue;
-                }
-                if (!isRtCompatible(candidate, signal)) {
                     continue;
                 }
                 if (Math.abs(candidate.getMzValue() - expected) <= ISOTOPE_TOLERANCE) {

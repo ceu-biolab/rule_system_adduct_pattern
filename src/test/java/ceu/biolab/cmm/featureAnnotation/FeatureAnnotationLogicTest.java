@@ -70,20 +70,6 @@ class FeatureAnnotationLogicTest {
     }
 
     @Test
-    void rtMismatch_filtersAllHypotheses() {
-        FeatureAnnotationService service = new FeatureAnnotationService();
-        FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
-        request.setToleranceMode(ToleranceMode.PPM);
-
-        request.getFeatures().add(buildFeature(200.0, 1000.0, 1.2));
-        request.getFeatures().add(buildFeature(221.98, 800.0, 2.8));
-
-        FeatureAnnotationResultDTO response = service.transform(request);
-        assertNotNull(response);
-        assertEquals(0, response.getResults().size());
-    }
-
-    @Test
     void filterThresholds_largeDatasetRequiresThreeMatches() {
         FeatureAnnotationService service = new FeatureAnnotationService();
         FeatureAnnotation.AnnotatedFeature hypothesis = new FeatureAnnotation.AnnotatedFeature();
