@@ -1,10 +1,13 @@
 package ceu.biolab.cmm.featureAnnotation.service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -13,383 +16,148 @@ import org.springframework.stereotype.Service;
 
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
-import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
 import ceu.biolab.cmm.shared.domain.adduct.AdductCatalog;
 import ceu.biolab.cmm.shared.domain.adduct.AdductDefinition;
+import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
 @Service
 public class FeatureAnnotationService {
     private static final Logger LOGGER = LoggerFactory.getLogger(FeatureAnnotationService.class);
 
-    //Constants for isotopic spacing.
-    private static final double ISOTOPE_SPACING = 1.0033;
-    private static final double HALF_ISOTOPE_SPACING = 0.5016;
-    private static final double THIRD_ISOTOPE_SPACING = 0.3344;
+    // Isotope spacing indexed by charge (1–3); index 0 unused
+    private static final double[] ISOTOPE_SPACINGS = {0.0, 1.0033, 0.5016, 0.3344};
+    private static final double DEFAULT_PPM    = 10.0;
+    private static final double DEFAULT_DALTON = 1.0;
 
-    //Tolerance thresholds for matching signals to adduct hypotheses.
-    private static final double TOLERANCE_PPM = 10.0;
-    private static final double TOLERANCE_DALTON = 1.0;
-
-    /**
-     * Transform the input DTO into the output DTO by resolving adduct matches and filtering them.
-     *
-     * @param input feature annotation input payload
-     * @return transformed feature annotation output payload
-     */
     public FeatureAnnotationResultDTO transform(FeatureAnnotationRequestDTO input) {
-        
-        //Generate all candidate annotations based on the input features and configured tolerance.
-        FeatureAnnotationResultDTO initial = resolveCombinations(input);
-        //Log the total number of input peaks to provide context for the number of generated hypotheses and filtering results.
-        int totalInputPeaks = input == null || input.getFeatures() == null ? 0 : input.getFeatures().size();
-        
-        //Filter the initial hypotheses based on match density and remove duplicates, then log the number of results at each step for traceability.
-        LOGGER.info("Generated {} initial hypotheses for {} input peaks", initial.getResults().size(), totalInputPeaks);
-        List<FeatureAnnotation.AnnotatedFeature> filtered = filter(new ArrayList<>(initial.getResults()), totalInputPeaks);
-        
-        //Return the filtered results in the output DTO, preserving the original order from the initial annotation step.
+        int n = input == null || input.getFeatures() == null ? 0 : input.getFeatures().size();
+        List<FeatureAnnotation.AnnotatedFeature> candidates = buildCandidates(input);
+        LOGGER.info("Generated {} initial hypotheses for {} input peaks", candidates.size(), n);
         FeatureAnnotationResultDTO output = new FeatureAnnotationResultDTO();
-        output.getResults().addAll(filtered);
+        output.getResults().addAll(filter(candidates, n));
         return output;
     }
 
-    /**
-     * Filter hypotheses based on match density and remove duplicates.
-     *
-     * @param results hypotheses to filter
-     * @param totalInputPeaks total number of input peaks (N)
-     * @return filtered hypotheses
-     */
-        public List<FeatureAnnotation.AnnotatedFeature> filter(
-            List<FeatureAnnotation.AnnotatedFeature> results,
-            int totalInputPeaks) {
-        if (results == null || results.isEmpty()) {
-            return List.of();
-        }
-
-        int threshold = totalInputPeaks > 4 ? 3 : 2;
+    public List<FeatureAnnotation.AnnotatedFeature> filter(
+            List<FeatureAnnotation.AnnotatedFeature> results, int n) {
+        if (results == null || results.isEmpty()) return List.of();
+        int threshold = n > 4 ? 3 : 2;
         List<FeatureAnnotation.AnnotatedFeature> passed = results.stream()
-                .filter(result -> countMatches(result) >= threshold)
+                .filter(f -> f.getItems().stream().filter(i -> i.getAdductName() != null).count() >= threshold)
                 .collect(Collectors.toList());
-
-        int discarded = results.size() - passed.size();
-        LOGGER.info("Discarded {} hypotheses below match threshold {}", discarded, threshold);
-
+        LOGGER.info("Discarded {} hypotheses below match threshold {}", results.size() - passed.size(), threshold);
         return deduplicate(passed);
     }
 
-    /**
-     * Resolve all plausible adduct combinations for the provided signals.
-     *
-     * @param input feature annotation input payload
-     * @return result DTO with all candidate annotations
-     */
-    private FeatureAnnotationResultDTO resolveCombinations(FeatureAnnotationRequestDTO input) {
-        FeatureAnnotationResultDTO result = new FeatureAnnotationResultDTO();
-        
-        if (input == null || input.getFeatures() == null || input.getFeatures().isEmpty()) {
-            return result;
-        }
+    // ── annotation pipeline ───────────────────────────────────────────────────
 
-        List<FeatureAnnotationRequestDTO.FeatureInput> signals = sortSignals(input.getFeatures());
-        List<AdductDefinition> adducts = loadAllAdducts();
-        Double tolerance = input.getTolerance();
+    private List<FeatureAnnotation.AnnotatedFeature> buildCandidates(FeatureAnnotationRequestDTO input) {
+        if (input == null || input.getFeatures() == null || input.getFeatures().isEmpty()) return List.of();
 
-        //Iterate over each signal and adduct definition to build hypothesis groups, then filter out empty groups before returning the result.
+        List<FeatureAnnotationRequestDTO.FeatureInput> signals = input.getFeatures().stream()
+                .sorted(Comparator.comparingDouble(FeatureAnnotationRequestDTO.FeatureInput::getMzValue))
+                .collect(Collectors.toList());
+
+        List<AdductDefinition> adducts = Arrays.stream(IonizationMode.values())
+                .flatMap(m -> AdductCatalog.definitionsFor(m).values().stream())
+                .collect(Collectors.toList());
+
+        ToleranceMode mode = input.getToleranceMode();
+        Double customTolerance = input.getTolerance();
+        List<FeatureAnnotation.AnnotatedFeature> candidates = new ArrayList<>();
+
         for (FeatureAnnotationRequestDTO.FeatureInput signal : signals) {
-
-            //Get the charge state for the current signal by analyzing isotopic spacing with nearby peaks, which will inform which adducts are plausible for this signal.
-            int charge = detectCharge(signal, signals, input.getToleranceMode(), tolerance);
-
-            //For each adduct definition, build a hypothesis group by treating the current signal as the source and looking for matching signals that fit the theoretical mass criteria.
+            int charge = detectCharge(signal, signals, mode, customTolerance);
             for (AdductDefinition sourceAdduct : adducts) {
-                FeatureAnnotation.AnnotatedFeature group =
-                        buildHypothesisGroup(signal, signals, adducts, input.getToleranceMode(), tolerance, charge, sourceAdduct);
-                if (group != null && !group.getItems().isEmpty()) {
-                    result.getResults().add(group);
-                }
+                if (charge != sourceAdduct.absoluteCharge()) continue;
+                candidates.add(buildHypothesis(signal, signals, adducts, mode, customTolerance, sourceAdduct));
             }
         }
-        return result;
+        return candidates;
     }
 
-    /**
-     * Count how many items in a hypothesis have an assigned adduct.
-     *
-     * @param result hypothesis to analyze
-     * @return number of matches
-     */
-    private long countMatches(FeatureAnnotation.AnnotatedFeature result) {
-        
-        if (result == null || result.getItems() == null) { return 0;}
-        
-        return result.getItems().stream()
-                .filter(item -> item != null && item.getAdductName() != null)
-                .count();
-    }
-
-    /**
-     * Deduplicate hypotheses treating items as an unordered set of feature/adduct pairs.
-     *
-     * @param results filtered hypotheses
-     * @return deduplicated hypotheses
-     */
-    private List<FeatureAnnotation.AnnotatedFeature> deduplicate(List<FeatureAnnotation.AnnotatedFeature> results) {
-        
-        Map<String, FeatureAnnotation.AnnotatedFeature> unique = new LinkedHashMap<>();
-        
-        for (FeatureAnnotation.AnnotatedFeature result : results) {
-            String signature = buildSignature(result);
-            unique.putIfAbsent(signature, result);
-        }
-
-        return new ArrayList<>(unique.values());
-    }
-
-    /**
-     * Build a stable signature for a hypothesis independent of item ordering.
-     *
-     * @param result hypothesis to fingerprint
-     * @return signature string
-     */
-    private String buildSignature(FeatureAnnotation.AnnotatedFeature result) {
-        
-        if (result == null || result.getItems() == null) { return ""; }
-        
-        return result.getItems().stream()
-                .filter(item -> item != null)
-                .sorted(Comparator.comparing(this::signaturePart))
-                .map(this::signaturePart)
-                .collect(Collectors.joining("|"));
-    }
-
-    /**
-     * Build a signature component for a single result item.
-     *
-     * @param item result item
-     * @return signature component
-     */
-    private String signaturePart(FeatureAnnotation.ResultItem item) {
-        String adduct = item.getAdductName() == null ? "" : item.getAdductName();
-        return item.getMzValue() + ":" + item.getIntensity() + ":" + item.getRetentionTime() + ":" + adduct;
-    }
-
-    /**
-     * Sort input signals by m/z to make matching predictable.
-     *
-     * @param signals raw input signals
-     * @return sorted list of signals
-     */
-    private List<FeatureAnnotationRequestDTO.FeatureInput> sortSignals(List<FeatureAnnotationRequestDTO.FeatureInput> signals) {
-        List<FeatureAnnotationRequestDTO.FeatureInput> sorted = new ArrayList<>(signals);
-        sorted.sort(Comparator.comparingDouble(FeatureAnnotationRequestDTO.FeatureInput::getMzValue));
-        return sorted;
-    }
-
-    /**
-     * Build a brute-force hypothesis group for one signal/adduct combination.
-     *
-     * @param sourceSignal signal used to compute the neutral mass
-     * @param signals all available signals
-     * @param adducts allowed adduct definitions
-     * @param toleranceMode configured tolerance mode
-     * @param charge detected charge for the source signal
-     * @param sourceAdduct adduct hypothesis for the source signal
-     * @return grouped annotations for the hypothesis
-     */
-    private FeatureAnnotation.AnnotatedFeature buildHypothesisGroup(FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
-                                                                             List<FeatureAnnotationRequestDTO.FeatureInput> signals,
-                                                                             List<AdductDefinition> adducts,
-                                                                             ToleranceMode toleranceMode,
-                                                                             Double tolerance,
-                                                                             int charge,
-                                                                             AdductDefinition sourceAdduct) {
-        if (charge != sourceAdduct.absoluteCharge()) {
-            return null;
-        }
-
-        //Calculate the theoretical neutral mass for the source signal based on its m/z and the adduct hypothesis, which will be used to find matching signals for other adducts.
-        double theoreticalMass = calculateTheoreticalMass(sourceSignal.getMzValue(), sourceAdduct);
-        FeatureAnnotation.AnnotatedFeature group = new FeatureAnnotation.AnnotatedFeature();
-        group.setItems(new java.util.LinkedHashSet<>(buildGroupItems(signals, theoreticalMass, adducts, toleranceMode, tolerance, sourceSignal, sourceAdduct)));
-        return group;
-    }
-
-    /**
-     * Compute theoretical neutral mass based on the adduct used for the hypothesis.
-     *
-     * @param mz measured mass-to-charge
-     * @param adduct adduct definition used as hypothesis
-     * @return theoretical neutral mass
-     */
-    private double calculateTheoreticalMass(double mz, AdductDefinition adduct) {
-        return (mz * adduct.absoluteCharge() - adduct.offset()) / adduct.multimer();
-    }
-
-    /**
-     * Resolve all matching signals for each adduct definition.
-     *
-     * @param signals all available signals
-     * @param theoreticalMass theoretical neutral mass
-     * @param adducts allowed adduct definitions
-     * @param toleranceMode configured tolerance mode
-     * @return list of matching result items
-     */
-    private List<FeatureAnnotation.ResultItem> buildGroupItems(
+    private FeatureAnnotation.AnnotatedFeature buildHypothesis(
+            FeatureAnnotationRequestDTO.FeatureInput source,
             List<FeatureAnnotationRequestDTO.FeatureInput> signals,
-            double theoreticalMass,
             List<AdductDefinition> adducts,
-            ToleranceMode toleranceMode,
-            Double tolerance,
-            FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
+            ToleranceMode mode, Double customTolerance,
             AdductDefinition sourceAdduct) {
-
-        List<FeatureAnnotation.ResultItem> items = new ArrayList<>();
-
+        double neutralMass = (source.getMzValue() * sourceAdduct.absoluteCharge() - sourceAdduct.offset())
+                / sourceAdduct.multimer();
+        LinkedHashSet<FeatureAnnotation.ResultItem> items = new LinkedHashSet<>();
         for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
-            String adduct = resolveAdductForSignal(candidate, theoreticalMass, adducts, toleranceMode, tolerance, sourceSignal);
-            if (candidate == sourceSignal) {
-                adduct = sourceAdduct.canonical();
-            }
-            items.add(toResultItem(candidate, adduct));
+            String adductName = candidate == source
+                    ? sourceAdduct.canonical()
+                    : bestAdductFor(candidate, neutralMass, adducts, mode, customTolerance);
+            FeatureAnnotation.ResultItem item = new FeatureAnnotation.ResultItem();
+            item.setMzValue(candidate.getMzValue());
+            item.setIntensity(candidate.getIntensity());
+            item.setRetentionTime(candidate.getRetentionTime());
+            item.setAdductName(adductName);
+            items.add(item);
         }
-        return items;
+        FeatureAnnotation.AnnotatedFeature hypothesis = new FeatureAnnotation.AnnotatedFeature();
+        hypothesis.setItems(items);
+        return hypothesis;
     }
 
-    /**
-     * Resolve the best adduct match for a specific signal within the tolerance.
-     *
-     * @param signal signal to annotate
-     * @param theoreticalMass theoretical neutral mass
-     * @param adducts allowed adduct definitions
-     * @param toleranceMode configured tolerance mode
-     * @return canonical adduct label or null when not matched
-     */
-    private String resolveAdductForSignal(FeatureAnnotationRequestDTO.FeatureInput signal,
-                                          double theoreticalMass,
-                                          List<AdductDefinition> adducts,
-                                          ToleranceMode toleranceMode,
-                                          Double tolerance,
-                                          FeatureAnnotationRequestDTO.FeatureInput sourceSignal) {
-        String bestAdduct = null;
+    private String bestAdductFor(FeatureAnnotationRequestDTO.FeatureInput signal, double neutralMass,
+                                  List<AdductDefinition> adducts, ToleranceMode mode, Double customTolerance) {
+        String best = null;
         double bestDelta = Double.POSITIVE_INFINITY;
         for (AdductDefinition adduct : adducts) {
-            double expectedMz = expectedMzFor(theoreticalMass, adduct);
-            double tol = resolveTolerance(expectedMz, toleranceMode, tolerance);
-            double delta = Math.abs(signal.getMzValue() - expectedMz);
-            if (delta <= tol && delta < bestDelta) {
+            double expected = (neutralMass * adduct.multimer() + adduct.offset()) / adduct.absoluteCharge();
+            double delta = Math.abs(signal.getMzValue() - expected);
+            if (delta <= resolveTolerance(expected, mode, customTolerance) && delta < bestDelta) {
                 bestDelta = delta;
-                bestAdduct = adduct.canonical();
+                best = adduct.canonical();
             }
         }
-        return bestAdduct;
+        return best;
     }
 
-    /**
-     * Compute the expected m/z for a theoretical mass and adduct definition.
-     *
-     * @param theoreticalMass theoretical neutral mass
-     * @param adduct adduct definition
-     * @return expected mass-to-charge value
-     */
-    private double expectedMzFor(double theoreticalMass, AdductDefinition adduct) {
-        return (theoreticalMass * adduct.multimer() + adduct.offset()) / adduct.absoluteCharge();
-    }
-
-
-    /**
-     * Detect the charge state for a signal by checking isotopic spacing against nearby peaks.
-     *
-     * @param signal target signal to inspect
-     * @param signals full list of signals to compare against
-     * @param toleranceMode tolerance mode used for matching
-     * @return detected charge state (1, 2, or 3)
-     */
     private int detectCharge(FeatureAnnotationRequestDTO.FeatureInput signal,
                              List<FeatureAnnotationRequestDTO.FeatureInput> signals,
-                             ToleranceMode toleranceMode,
-                             Double tolerance) {
-
-        for (int charge = 1; charge <= 3; charge++) {
-            double spacing = isotopeSpacingForCharge(charge);
-            double expected = signal.getMzValue() + spacing;
-            for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
-                if (candidate == signal) {
-                    continue;
-                }
-                if (Math.abs(candidate.getMzValue() - expected) <= resolveTolerance(expected, toleranceMode, tolerance)) {
-                    return charge;
+                             ToleranceMode mode, Double customTolerance) {
+        for (int z = 1; z <= 3; z++) {
+            double expected = signal.getMzValue() + ISOTOPE_SPACINGS[z];
+            for (FeatureAnnotationRequestDTO.FeatureInput other : signals) {
+                if (other != signal
+                        && Math.abs(other.getMzValue() - expected) <= resolveTolerance(expected, mode, customTolerance)) {
+                    return z;
                 }
             }
         }
         return 1;
     }
 
-    /**
-     * Return expected isotopic spacing for a given charge state.
-     *
-     * @param charge charge state
-     * @return isotopic spacing in m/z units
-     */
-    private double isotopeSpacingForCharge(int charge) {
-        if (charge == 2) {
-            return HALF_ISOTOPE_SPACING;
-        }
-        if (charge == 3) {
-            return THIRD_ISOTOPE_SPACING;
-        }
-        return ISOTOPE_SPACING;
+    // ── deduplication ─────────────────────────────────────────────────────────
+
+    private List<FeatureAnnotation.AnnotatedFeature> deduplicate(List<FeatureAnnotation.AnnotatedFeature> results) {
+        Map<String, FeatureAnnotation.AnnotatedFeature> unique = new LinkedHashMap<>();
+        for (FeatureAnnotation.AnnotatedFeature f : results) unique.putIfAbsent(signature(f), f);
+        return new ArrayList<>(unique.values());
     }
 
-    /**
-    * Load all adduct definitions from resources.
-     *
-     * @return list of allowed adduct definitions
-     */
-    private List<AdductDefinition> loadAllAdducts() {
-        
-        List<AdductDefinition> allowed = new ArrayList<>();
-        
-        for (IonizationMode mode : IonizationMode.values()) {
-            for (AdductDefinition definition : AdductCatalog.definitionsFor(mode).values()) {
-                allowed.add(definition);
-            }
-        }
-        return allowed;
+    private String signature(FeatureAnnotation.AnnotatedFeature f) {
+        return f.getItems().stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(this::itemKey))
+                .map(this::itemKey)
+                .collect(Collectors.joining("|"));
     }
 
-    /**
-     * Resolve the matching tolerance for a specific m/z based on the configured mode.
-     *
-     * @param mz target mass-to-charge to evaluate
-     * @param mode tolerance mode (PPM or DALTON)
-     * @return absolute tolerance in Daltons
-     */
-    private double resolveTolerance(double mz, ToleranceMode mode, Double customTolerance) {
-        double value = customTolerance != null ? customTolerance : (mode == ToleranceMode.PPM ? TOLERANCE_PPM : TOLERANCE_DALTON);
-        if (mode == ToleranceMode.PPM) {
-            return mz * value / 1_000_000.0;
-        }
-        return value;
+    private String itemKey(FeatureAnnotation.ResultItem item) {
+        return item.getMzValue() + ":" + item.getIntensity() + ":" + item.getRetentionTime() + ":"
+                + (item.getAdductName() == null ? "" : item.getAdductName());
     }
 
+    // ── tolerance ─────────────────────────────────────────────────────────────
 
-    /**
-     * Convert a matched signal into a result item with the assigned adduct label.
-     *
-     * @param input matched signal
-     * @param adduct assigned adduct label
-     * @return result item
-     */
-    private FeatureAnnotation.ResultItem toResultItem(FeatureAnnotationRequestDTO.FeatureInput input,
-                                                      String adduct) {
-        FeatureAnnotation.ResultItem item = new FeatureAnnotation.ResultItem();
-        item.setMzValue(input.getMzValue());
-        item.setIntensity(input.getIntensity());
-        item.setRetentionTime(input.getRetentionTime());
-        item.setAdductName(adduct);
-        return item;
+    private double resolveTolerance(double mz, ToleranceMode mode, Double custom) {
+        double value = custom != null ? custom : (mode == ToleranceMode.PPM ? DEFAULT_PPM : DEFAULT_DALTON);
+        return mode == ToleranceMode.PPM ? mz * value / 1_000_000.0 : value;
     }
 }

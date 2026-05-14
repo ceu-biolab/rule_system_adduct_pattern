@@ -12,6 +12,8 @@ Spring Boot backend that annotates LC-MS features with adducts and scores them a
 mvn spring-boot:run
 ```
 
+Runs on **port 9090** (`server.port=9090` in `application.properties`).
+
 ---
 
 ## Endpoints
@@ -57,10 +59,16 @@ FeatureInput
   intensity      Double   — signal intensity
   retentionTime  Double   — retention time (carried through; not used for filtering)
 
+FeatureAnnotationRequestDTO
+  features       List<FeatureInput>
+  toleranceMode  ToleranceMode        — PPM | DALTON
+  tolerance      Double               — optional, overrides the mode default (10 ppm / 1 Da)
+
 RulePuntuationRequestDTO
   features       List<FeatureInput>
   mobilePhases   List<MobilePhases>   — e.g. [CH3COO, HCOO]
   toleranceMode  ToleranceMode        — PPM | DALTON
+  tolerance      Double               — optional, overrides the mode default (10 ppm / 1 Da)
   ruleTarget     RuleTarget           — e.g. PC, TG, Cer, SM …
   ionizationMode IonizationMode       — POSITIVE | NEGATIVE
   sampleType     SampleType           — optional, default: PLASMA
@@ -137,10 +145,12 @@ For every `(sourceSignal, sourceAdduct)` pair where the detected charge matches 
 
 **Tolerance:**
 
-| Mode | Formula |
-|---|---|
-| PPM | `mz × 10 / 1_000_000` |
-| DALTON | `1.0 Da` |
+| Mode | Default formula | Custom `tolerance` field |
+|---|---|---|
+| PPM | `mz × 10 / 1_000_000` | `mz × tolerance / 1_000_000` |
+| DALTON | `0.01 Da` | `tolerance Da` |
+
+If `tolerance` is omitted the defaults (10 ppm / 1 Da) apply.
 
 ### Step 4 — Filter
 
@@ -159,15 +169,21 @@ Two hypotheses that produce the same set of `(mz, intensity, rt, adductName)` tu
 
 ## Rule Punctuation
 
-### Rule Source — Excel Decision Table
+### Rule Source — Excel Decision Tables
 
-All rules live in a single Excel workbook:
+Rules are split across six **Drools Decision Table** (DTABLE) workbooks, divided by polarity and rule type:
 
 ```
-src/main/resources/rules/AdductRules.drl.xlsx
+src/main/resources/rules/
+  positive_presence.xlsx      — presence / absence rules  (positive mode)
+  positive_intensityGT.xlsx   — correct intensity order   (positive mode)
+  positive_intensityLT.xlsx   — wrong intensity order     (positive mode)
+  negative_presence.xlsx      — presence / absence rules  (negative mode)
+  negative_intensityGT.xlsx   — correct intensity order   (negative mode)
+  negative_intensityLT.xlsx   — wrong intensity order     (negative mode)
 ```
 
-This is a **Drools Decision Table** (DTABLE format). At startup `DroolsConfig` loads the workbook directly — there is no DRL scanning. The individual `.drl` files under `rules/positive/` and `rules/negative/` are kept as reference and can be re-generated from the Excel via the conversion script at `src/main/resources/convertDRLtoExcel/gen_decision_table.py`.
+At startup `DroolsConfig` loads all six workbooks.
 
 ### Rule Selection Within the Session
 
@@ -288,15 +304,15 @@ ceu.biolab.cmm
 │   ├── domain/           IonizationMode, MobilePhases, RuleTarget, SampleType, ToleranceMode
 │   └── dto/              FeatureAnnotation (AnnotatedFeature, ResultItem)
 │
-└── config/               DroolsConfig (loads AdductRules.drl.xlsx at startup)
+└── config/               DroolsConfig (loads six xlsx files at startup)
 
 src/main/resources/
 ├── adducts/              CSV adduct catalogs (positive / negative)
-├── convertDRLtoExcel/    gen_decision_table.py — converts .drl files → AdductRules.drl.xlsx
 └── rules/
-    ├── AdductRules.drl.xlsx   ← single Drools Decision Table loaded at startup
-    ├── positive/         {LipidClass}_PositiveCheck.drl  (18 reference files)
-    │   └── userFiles/    user-editable drafts
-    └── negative/         {LipidClass}_NegativeCheck.drl  (15 reference files)
-        └── userFiles/    user-editable drafts
+    ├── positive_presence.xlsx
+    ├── positive_intensityGT.xlsx
+    ├── positive_intensityLT.xlsx
+    ├── negative_presence.xlsx
+    ├── negative_intensityGT.xlsx
+    └── negative_intensityLT.xlsx
 ```

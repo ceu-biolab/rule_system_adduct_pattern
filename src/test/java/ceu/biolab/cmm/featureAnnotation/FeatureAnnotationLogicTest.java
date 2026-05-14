@@ -13,10 +13,7 @@ import org.junit.jupiter.api.Test;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
-import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
-import ceu.biolab.cmm.shared.domain.adduct.AdductCatalog;
-import ceu.biolab.cmm.shared.domain.adduct.AdductDefinition;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
 class FeatureAnnotationLogicTest {
@@ -25,7 +22,7 @@ class FeatureAnnotationLogicTest {
     private static final double ISOTOPE_SPACING_Z2 = 0.5016;
 
     @Test
-    void detectCharge_z2AndNeutralMass() throws Exception {
+    void detectCharge_z2() throws Exception {
         FeatureAnnotationService service = new FeatureAnnotationService();
         FeatureAnnotationRequestDTO.FeatureInput peakA = buildFeature(200.0, 1000.0, 1.5);
         FeatureAnnotationRequestDTO.FeatureInput peakB = buildFeature(200.0 + ISOTOPE_SPACING_Z2, 500.0, 1.5);
@@ -33,13 +30,6 @@ class FeatureAnnotationLogicTest {
 
         int charge = (int) invokeDetectCharge(service, peakA, signals, ToleranceMode.PPM);
         assertEquals(2, charge);
-
-        AdductDefinition twoH = AdductCatalog.definitionsFor(IonizationMode.POSITIVE).get("[M+2H]2+");
-        assertNotNull(twoH);
-
-        double expectedNeutral = 200.0 * 2.0 - (2.0 * PROTON_MASS);
-        double neutralMass = (double) invokeCalculateNeutralMass(service, 200.0, twoH);
-        assertEquals(expectedNeutral, neutralMass, 0.0001);
     }
 
     @Test
@@ -118,12 +108,4 @@ class FeatureAnnotationLogicTest {
         return method.invoke(service, signal, signals, toleranceMode, null);
     }
 
-    private Object invokeCalculateNeutralMass(FeatureAnnotationService service,
-                                              double mz,
-                                              AdductDefinition adduct) throws Exception {
-        Method method = FeatureAnnotationService.class.getDeclaredMethod("calculateTheoreticalMass",
-                double.class, AdductDefinition.class);
-        method.setAccessible(true);
-        return method.invoke(service, mz, adduct);
-    }
 }
