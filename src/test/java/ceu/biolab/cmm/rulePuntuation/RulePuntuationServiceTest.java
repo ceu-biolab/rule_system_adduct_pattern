@@ -16,6 +16,7 @@ import ceu.biolab.cmm.rulePuntuation.service.RulePuntuationService;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.MobilePhases;
 import ceu.biolab.cmm.shared.domain.RuleTarget;
+import ceu.biolab.cmm.shared.domain.SampleType;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
@@ -57,8 +58,8 @@ class RulePuntuationServiceTest {
         );
         List<MobilePhases> phases = List.of(MobilePhases.CH3COO);
 
-        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.POSITIVE);
-        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
+        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.POSITIVE, SampleType.PLASMA);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE, SampleType.PLASMA);
 
         assertAll(
                 () -> assertTrue(dgScore > pcScore,
@@ -79,8 +80,8 @@ class RulePuntuationServiceTest {
         );
         List<MobilePhases> phases = List.of(MobilePhases.CH3COO);
 
-        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
-        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.POSITIVE);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE, SampleType.PLASMA);
+        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.POSITIVE, SampleType.PLASMA);
 
         assertAll(
                 () -> assertTrue(pcScore > dgScore,
@@ -102,8 +103,8 @@ class RulePuntuationServiceTest {
         );
         List<MobilePhases> phases = List.of(MobilePhases.CH3COO);
 
-        int ceScore = service.scoreFeature(feature, phases, RuleTarget.CE, IonizationMode.POSITIVE);
-        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
+        int ceScore = service.scoreFeature(feature, phases, RuleTarget.CE, IonizationMode.POSITIVE, SampleType.PLASMA);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE, SampleType.PLASMA);
 
         assertAll(
                 () -> assertTrue(ceScore > pcScore,
@@ -128,8 +129,8 @@ class RulePuntuationServiceTest {
         List<MobilePhases> phases = List.of(
                 MobilePhases.NH4, MobilePhases.CH3CN, MobilePhases.CH3OH);
 
-        int tgScore = service.scoreFeature(feature, phases, RuleTarget.TG, IonizationMode.POSITIVE);
-        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE);
+        int tgScore = service.scoreFeature(feature, phases, RuleTarget.TG, IonizationMode.POSITIVE, SampleType.PLASMA);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.POSITIVE, SampleType.PLASMA);
 
         assertAll(
                 () -> assertTrue(tgScore > pcScore,
@@ -157,8 +158,8 @@ class RulePuntuationServiceTest {
         );
         List<MobilePhases> phases = List.of(MobilePhases.CH3COO, MobilePhases.HCOO);
 
-        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.NEGATIVE);
-        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.NEGATIVE);
+        int pcScore = service.scoreFeature(feature, phases, RuleTarget.PC, IonizationMode.NEGATIVE, SampleType.PLASMA);
+        int dgScore = service.scoreFeature(feature, phases, RuleTarget.DG, IonizationMode.NEGATIVE, SampleType.PLASMA);
 
         assertAll(
                 () -> assertTrue(pcScore > dgScore,
