@@ -1,5 +1,7 @@
 package ceu.biolab.cmm.config;
 
+import java.util.List;
+
 import org.kie.api.KieServices;
 import org.kie.api.builder.KieBuilder;
 import org.kie.api.builder.KieFileSystem;
@@ -13,15 +15,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class DroolsConfig {
 
+    private static final List<String> RULE_FILES = List.of(
+            "rules/positive_presence.xlsx",
+            "rules/positive_intensityGT.xlsx",
+            "rules/positive_intensityLT.xlsx",
+            "rules/negative_presence.xlsx",
+            "rules/negative_intensityGT.xlsx",
+            "rules/negative_intensityLT.xlsx"
+    );
+
     @Bean
     public KieContainer kieContainer() {
         KieServices ks = KieServices.Factory.get();
         KieFileSystem kfs = ks.newKieFileSystem();
 
-        Resource xlsx = ks.getResources()
-                .newClassPathResource("rules/AdductRules.drl.xlsx");
-        xlsx.setResourceType(ResourceType.DTABLE);
-        kfs.write(xlsx);
+        for (String path : RULE_FILES) {
+            Resource xlsx = ks.getResources().newClassPathResource(path);
+            xlsx.setResourceType(ResourceType.DTABLE);
+            kfs.write(xlsx);
+        }
 
         KieBuilder builder = ks.newKieBuilder(kfs).buildAll();
         Results results = builder.getResults();
