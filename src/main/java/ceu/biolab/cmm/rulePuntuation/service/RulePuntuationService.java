@@ -17,14 +17,13 @@ import ceu.biolab.cmm.rulePuntuation.dto.RulePuntuationResponseDTO;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.MobilePhases;
 import ceu.biolab.cmm.shared.domain.RuleTarget;
+import ceu.biolab.cmm.shared.domain.SampleType;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
 @Service
 public class RulePuntuationService {
 
     private static final Logger logger = LoggerFactory.getLogger(RulePuntuationService.class);
-
-    private static final String SAMPLE_TYPE = "PLASMA";
 
     private final KieContainer kieContainer;
     private final FeatureAnnotationService featureAnnotationService;
@@ -56,7 +55,7 @@ public class RulePuntuationService {
 
         List<RulePuntuationResponseDTO.ScoredFeature> scored = new ArrayList<>();
         for (FeatureAnnotation.AnnotatedFeature feature : annotationResult.getResults()) {
-            applyRules(feature, request.getMobilePhases(), rulePrefix);
+            applyRules(feature, request.getMobilePhases(), rulePrefix, request.getSampleType());
             scored.add(new RulePuntuationResponseDTO.ScoredFeature(
                     feature,
                     feature.getScore(),
@@ -79,14 +78,16 @@ public class RulePuntuationService {
      * @param mobilePhases   mobile phases present in the sample
      * @param ruleTarget     lipid class whose rules should be applied
      * @param ionizationMode polarity used during acquisition
+     * @param sampleType     type of biological sample
      * @return accumulated score after all matching rules have fired
      */
     public int scoreFeature(FeatureAnnotation.AnnotatedFeature feature,
                             List<MobilePhases> mobilePhases,
                             RuleTarget ruleTarget,
-                            IonizationMode ionizationMode) {
+                            IonizationMode ionizationMode,
+                            SampleType sampleType) {
         feature.reset();
-        applyRules(feature, mobilePhases, buildRulePrefix(ruleTarget, ionizationMode));
+        applyRules(feature, mobilePhases, buildRulePrefix(ruleTarget, ionizationMode), sampleType);
         return feature.getScore();
     }
 
@@ -112,15 +113,17 @@ public class RulePuntuationService {
      * @param feature      annotated feature to evaluate
      * @param mobilePhases mobile phases to expose as a global
      * @param rulePrefix   agenda filter prefix (e.g. "PC_PositiveCheck")
+     * @param sampleType   type of biological sample to expose as a global
      */
     private void applyRules(FeatureAnnotation.AnnotatedFeature feature,
                             List<MobilePhases> mobilePhases,
-                            String rulePrefix) {
+                            String rulePrefix,
+                            SampleType sampleType) {
         KieSession session = kieContainer.newKieSession();
         try {
             session.setGlobal("lipid", feature);
             session.setGlobal("mobilePhases", mobilePhases);
-            session.setGlobal("sampleType", SAMPLE_TYPE);
+            session.setGlobal("sampleType", sampleType.name());
 
             for (FeatureAnnotation.ResultItem item : feature.getItems()) {
                 if (item != null) session.insert(item);

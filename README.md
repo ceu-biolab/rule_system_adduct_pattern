@@ -63,6 +63,7 @@ RulePuntuationRequestDTO
   toleranceMode  ToleranceMode        — PPM | DALTON
   ruleTarget     RuleTarget           — e.g. PC, TG, Cer, SM …
   ionizationMode IonizationMode       — POSITIVE | NEGATIVE
+  sampleType     SampleType           — optional, default: PLASMA
 ```
 
 **Internal annotation result (shared between both services)**
@@ -111,9 +112,9 @@ Each signal is checked against all other signals for isotopic spacing to determi
 
 | Charge (z) | Expected M+1 spacing (m/z) | Tolerance |
 |---|---|---|
-| 1 | 1.0033 | ±0.01 Da |
-| 2 | 0.5016 | ±0.01 Da |
-| 3 | 0.3344 | ±0.01 Da |
+| 1 | 1.0033 | same as adduct matching (`toleranceMode`) |
+| 2 | 0.5016 | same as adduct matching (`toleranceMode`) |
+| 3 | 0.3344 | same as adduct matching (`toleranceMode`) |
 
 ### Step 3 — Build hypothesis groups (one per signal × adduct)
 
@@ -194,7 +195,7 @@ Each `AnnotatedFeature` gets its own `KieSession`:
 |---|---|
 | Global `lipid` | The `AnnotatedFeature` being scored |
 | Global `mobilePhases` | `List<MobilePhases>` from the request |
-| Global `sampleType` | Hardcoded `"PLASMA"` |
+| Global `sampleType` | `SampleType` from the request (default: `PLASMA`) |
 | Facts | One `ResultItem` inserted per annotated signal |
 
 ### Rule Types
@@ -284,7 +285,7 @@ ceu.biolab.cmm
 │   └── dto/              RulePuntuationRequestDTO, RulePuntuationResponseDTO
 │
 ├── shared/
-│   ├── domain/           IonizationMode, MobilePhases, RuleTarget, ToleranceMode
+│   ├── domain/           IonizationMode, MobilePhases, RuleTarget, SampleType, ToleranceMode
 │   └── dto/              FeatureAnnotation (AnnotatedFeature, ResultItem)
 │
 └── config/               DroolsConfig (loads AdductRules.drl.xlsx at startup)

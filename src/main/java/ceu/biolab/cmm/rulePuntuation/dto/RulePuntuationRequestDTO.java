@@ -7,6 +7,7 @@ import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.MobilePhases;
 import ceu.biolab.cmm.shared.domain.RuleTarget;
+import ceu.biolab.cmm.shared.domain.SampleType;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -31,4 +32,6 @@ public class RulePuntuationRequestDTO {
 
     @NotNull
     private IonizationMode ionizationMode;
+
+    private SampleType sampleType = SampleType.PLASMA;
 }
