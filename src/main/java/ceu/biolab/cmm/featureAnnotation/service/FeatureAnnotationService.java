@@ -95,17 +95,18 @@ public class FeatureAnnotationService {
 
         List<FeatureAnnotationRequestDTO.FeatureInput> signals = sortSignals(input.getFeatures());
         List<AdductDefinition> adducts = loadAllAdducts();
+        Double tolerance = input.getTolerance();
 
         //Iterate over each signal and adduct definition to build hypothesis groups, then filter out empty groups before returning the result.
         for (FeatureAnnotationRequestDTO.FeatureInput signal : signals) {
-            
+
             //Get the charge state for the current signal by analyzing isotopic spacing with nearby peaks, which will inform which adducts are plausible for this signal.
-            int charge = detectCharge(signal, signals, input.getToleranceMode());
-            
+            int charge = detectCharge(signal, signals, input.getToleranceMode(), tolerance);
+
             //For each adduct definition, build a hypothesis group by treating the current signal as the source and looking for matching signals that fit the theoretical mass criteria.
             for (AdductDefinition sourceAdduct : adducts) {
                 FeatureAnnotation.AnnotatedFeature group =
-                        buildHypothesisGroup(signal, signals, adducts, input.getToleranceMode(), charge, sourceAdduct);
+                        buildHypothesisGroup(signal, signals, adducts, input.getToleranceMode(), tolerance, charge, sourceAdduct);
                 if (group != null && !group.getItems().isEmpty()) {
                     result.getResults().add(group);
                 }
@@ -202,6 +203,7 @@ public class FeatureAnnotationService {
                                                                              List<FeatureAnnotationRequestDTO.FeatureInput> signals,
                                                                              List<AdductDefinition> adducts,
                                                                              ToleranceMode toleranceMode,
+                                                                             Double tolerance,
                                                                              int charge,
                                                                              AdductDefinition sourceAdduct) {
         if (charge != sourceAdduct.absoluteCharge()) {
@@ -211,7 +213,7 @@ public class FeatureAnnotationService {
         //Calculate the theoretical neutral mass for the source signal based on its m/z and the adduct hypothesis, which will be used to find matching signals for other adducts.
         double theoreticalMass = calculateTheoreticalMass(sourceSignal.getMzValue(), sourceAdduct);
         FeatureAnnotation.AnnotatedFeature group = new FeatureAnnotation.AnnotatedFeature();
-        group.setItems(new java.util.LinkedHashSet<>(buildGroupItems(signals, theoreticalMass, adducts, toleranceMode, sourceSignal, sourceAdduct)));
+        group.setItems(new java.util.LinkedHashSet<>(buildGroupItems(signals, theoreticalMass, adducts, toleranceMode, tolerance, sourceSignal, sourceAdduct)));
         return group;
     }
 
@@ -240,13 +242,14 @@ public class FeatureAnnotationService {
             double theoreticalMass,
             List<AdductDefinition> adducts,
             ToleranceMode toleranceMode,
+            Double tolerance,
             FeatureAnnotationRequestDTO.FeatureInput sourceSignal,
             AdductDefinition sourceAdduct) {
-        
+
         List<FeatureAnnotation.ResultItem> items = new ArrayList<>();
-        
+
         for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
-            String adduct = resolveAdductForSignal(candidate, theoreticalMass, adducts, toleranceMode, sourceSignal);
+            String adduct = resolveAdductForSignal(candidate, theoreticalMass, adducts, toleranceMode, tolerance, sourceSignal);
             if (candidate == sourceSignal) {
                 adduct = sourceAdduct.canonical();
             }
@@ -268,14 +271,15 @@ public class FeatureAnnotationService {
                                           double theoreticalMass,
                                           List<AdductDefinition> adducts,
                                           ToleranceMode toleranceMode,
+                                          Double tolerance,
                                           FeatureAnnotationRequestDTO.FeatureInput sourceSignal) {
         String bestAdduct = null;
         double bestDelta = Double.POSITIVE_INFINITY;
         for (AdductDefinition adduct : adducts) {
             double expectedMz = expectedMzFor(theoreticalMass, adduct);
-            double tolerance = resolveTolerance(expectedMz, toleranceMode);
+            double tol = resolveTolerance(expectedMz, toleranceMode, tolerance);
             double delta = Math.abs(signal.getMzValue() - expectedMz);
-            if (delta <= tolerance && delta < bestDelta) {
+            if (delta <= tol && delta < bestDelta) {
                 bestDelta = delta;
                 bestAdduct = adduct.canonical();
             }
@@ -305,7 +309,8 @@ public class FeatureAnnotationService {
      */
     private int detectCharge(FeatureAnnotationRequestDTO.FeatureInput signal,
                              List<FeatureAnnotationRequestDTO.FeatureInput> signals,
-                             ToleranceMode toleranceMode) {
+                             ToleranceMode toleranceMode,
+                             Double tolerance) {
 
         for (int charge = 1; charge <= 3; charge++) {
             double spacing = isotopeSpacingForCharge(charge);
@@ -314,7 +319,7 @@ public class FeatureAnnotationService {
                 if (candidate == signal) {
                     continue;
                 }
-                if (Math.abs(candidate.getMzValue() - expected) <= resolveTolerance(expected, toleranceMode)) {
+                if (Math.abs(candidate.getMzValue() - expected) <= resolveTolerance(expected, toleranceMode, tolerance)) {
                     return charge;
                 }
             }
@@ -362,11 +367,12 @@ public class FeatureAnnotationService {
      * @param mode tolerance mode (PPM or DALTON)
      * @return absolute tolerance in Daltons
      */
-    private double resolveTolerance(double mz, ToleranceMode mode) {
+    private double resolveTolerance(double mz, ToleranceMode mode, Double customTolerance) {
+        double value = customTolerance != null ? customTolerance : (mode == ToleranceMode.PPM ? TOLERANCE_PPM : TOLERANCE_DALTON);
         if (mode == ToleranceMode.PPM) {
-            return mz * TOLERANCE_PPM / 1_000_000.0;
+            return mz * value / 1_000_000.0;
         }
-        return TOLERANCE_DALTON;
+        return value;
     }
 
 

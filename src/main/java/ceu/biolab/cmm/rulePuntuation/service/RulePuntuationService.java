@@ -102,6 +102,7 @@ public class RulePuntuationService {
         FeatureAnnotationRequestDTO dto = new FeatureAnnotationRequestDTO();
         dto.setFeatures(new ArrayList<>(request.getFeatures()));
         dto.setToleranceMode(request.getToleranceMode());
+        dto.setTolerance(request.getTolerance());
         return dto;
     }
 

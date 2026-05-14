@@ -113,9 +113,9 @@ class FeatureAnnotationLogicTest {
                                       List<FeatureAnnotationRequestDTO.FeatureInput> signals,
                                       ToleranceMode toleranceMode) throws Exception {
         Method method = FeatureAnnotationService.class.getDeclaredMethod("detectCharge",
-                FeatureAnnotationRequestDTO.FeatureInput.class, List.class, ToleranceMode.class);
+                FeatureAnnotationRequestDTO.FeatureInput.class, List.class, ToleranceMode.class, Double.class);
         method.setAccessible(true);
-        return method.invoke(service, signal, signals, toleranceMode);
+        return method.invoke(service, signal, signals, toleranceMode, null);
     }
 
     private Object invokeCalculateNeutralMass(FeatureAnnotationService service,

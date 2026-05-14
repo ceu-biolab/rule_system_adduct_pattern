@@ -20,6 +20,8 @@ public class FeatureAnnotationRequestDTO {
     @NotNull
     private ToleranceMode toleranceMode;
 
+    private Double tolerance;
+
     @Data
     public static class FeatureInput {
         @NotNull

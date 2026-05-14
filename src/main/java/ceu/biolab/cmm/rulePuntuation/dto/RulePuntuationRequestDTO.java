@@ -34,4 +34,6 @@ public class RulePuntuationRequestDTO {
     private IonizationMode ionizationMode;
 
     private SampleType sampleType = SampleType.PLASMA;
+
+    private Double tolerance;
 }
