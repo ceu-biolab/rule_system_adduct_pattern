@@ -31,7 +31,7 @@ class FeatureAnnotationLogicTest {
         FeatureAnnotationRequestDTO.FeatureInput peakB = buildFeature(200.0 + ISOTOPE_SPACING_Z2, 500.0, 1.5);
         List<FeatureAnnotationRequestDTO.FeatureInput> signals = List.of(peakA, peakB);
 
-        int charge = (int) invokeDetectCharge(service, peakA, signals);
+        int charge = (int) invokeDetectCharge(service, peakA, signals, ToleranceMode.PPM);
         assertEquals(2, charge);
 
         AdductDefinition twoH = AdductCatalog.definitionsFor(IonizationMode.POSITIVE).get("[M+2H]2+");
@@ -110,11 +110,12 @@ class FeatureAnnotationLogicTest {
 
     private Object invokeDetectCharge(FeatureAnnotationService service,
                                       FeatureAnnotationRequestDTO.FeatureInput signal,
-                                      List<FeatureAnnotationRequestDTO.FeatureInput> signals) throws Exception {
+                                      List<FeatureAnnotationRequestDTO.FeatureInput> signals,
+                                      ToleranceMode toleranceMode) throws Exception {
         Method method = FeatureAnnotationService.class.getDeclaredMethod("detectCharge",
-                FeatureAnnotationRequestDTO.FeatureInput.class, List.class);
+                FeatureAnnotationRequestDTO.FeatureInput.class, List.class, ToleranceMode.class);
         method.setAccessible(true);
-        return method.invoke(service, signal, signals);
+        return method.invoke(service, signal, signals, toleranceMode);
     }
 
     private Object invokeCalculateNeutralMass(FeatureAnnotationService service,

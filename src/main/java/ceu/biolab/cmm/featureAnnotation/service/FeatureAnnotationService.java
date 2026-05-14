@@ -29,7 +29,6 @@ public class FeatureAnnotationService {
     private static final double THIRD_ISOTOPE_SPACING = 0.3344;
 
     //Tolerance thresholds for matching signals to adduct hypotheses.
-    private static final double ISOTOPE_TOLERANCE = 0.01;
     private static final double TOLERANCE_PPM = 10.0;
     private static final double TOLERANCE_DALTON = 1.0;
 
@@ -101,7 +100,7 @@ public class FeatureAnnotationService {
         for (FeatureAnnotationRequestDTO.FeatureInput signal : signals) {
             
             //Get the charge state for the current signal by analyzing isotopic spacing with nearby peaks, which will inform which adducts are plausible for this signal.
-            int charge = detectCharge(signal, signals);
+            int charge = detectCharge(signal, signals, input.getToleranceMode());
             
             //For each adduct definition, build a hypothesis group by treating the current signal as the source and looking for matching signals that fit the theoretical mass criteria.
             for (AdductDefinition sourceAdduct : adducts) {
@@ -301,11 +300,13 @@ public class FeatureAnnotationService {
      *
      * @param signal target signal to inspect
      * @param signals full list of signals to compare against
+     * @param toleranceMode tolerance mode used for matching
      * @return detected charge state (1, 2, or 3)
      */
     private int detectCharge(FeatureAnnotationRequestDTO.FeatureInput signal,
-                             List<FeatureAnnotationRequestDTO.FeatureInput> signals) {
-        
+                             List<FeatureAnnotationRequestDTO.FeatureInput> signals,
+                             ToleranceMode toleranceMode) {
+
         for (int charge = 1; charge <= 3; charge++) {
             double spacing = isotopeSpacingForCharge(charge);
             double expected = signal.getMzValue() + spacing;
@@ -313,7 +314,7 @@ public class FeatureAnnotationService {
                 if (candidate == signal) {
                     continue;
                 }
-                if (Math.abs(candidate.getMzValue() - expected) <= ISOTOPE_TOLERANCE) {
+                if (Math.abs(candidate.getMzValue() - expected) <= resolveTolerance(expected, toleranceMode)) {
                     return charge;
                 }
             }
