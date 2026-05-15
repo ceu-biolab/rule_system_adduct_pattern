@@ -3,12 +3,12 @@ package ceu.biolab.cmm.rulePuntuation.service;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import ceu.biolab.cmm.config.KieContainerProvider;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
@@ -25,12 +25,12 @@ public class RulePuntuationService {
 
     private static final Logger logger = LoggerFactory.getLogger(RulePuntuationService.class);
 
-    private final KieContainer kieContainer;
+    private final KieContainerProvider kieContainerProvider;
     private final FeatureAnnotationService featureAnnotationService;
 
-    public RulePuntuationService(KieContainer kieContainer,
+    public RulePuntuationService(KieContainerProvider kieContainerProvider,
                                   FeatureAnnotationService featureAnnotationService) {
-        this.kieContainer = kieContainer;
+        this.kieContainerProvider = kieContainerProvider;
         this.featureAnnotationService = featureAnnotationService;
     }
 
@@ -120,7 +120,7 @@ public class RulePuntuationService {
                             List<MobilePhases> mobilePhases,
                             String rulePrefix,
                             SampleType sampleType) {
-        KieSession session = kieContainer.newKieSession();
+        KieSession session = kieContainerProvider.getContainer().newKieSession();
         try {
             session.setGlobal("lipid", feature);
             session.setGlobal("mobilePhases", mobilePhases);

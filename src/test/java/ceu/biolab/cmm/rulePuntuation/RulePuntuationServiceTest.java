@@ -9,9 +9,8 @@ import java.util.Set;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.kie.api.runtime.KieContainer;
 
-import ceu.biolab.cmm.config.DroolsConfig;
+import ceu.biolab.cmm.config.KieContainerProvider;
 import ceu.biolab.cmm.rulePuntuation.service.RulePuntuationService;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.MobilePhases;
@@ -35,9 +34,9 @@ class RulePuntuationServiceTest {
 
     @BeforeAll
     static void buildService() {
-        KieContainer kieContainer = new DroolsConfig().kieContainer();
+        KieContainerProvider provider = new KieContainerProvider();
         // featureAnnotationService is unused by scoreFeature
-        service = new RulePuntuationService(kieContainer, null);
+        service = new RulePuntuationService(provider, null);
     }
 
     // -------------------------------------------------------------------------

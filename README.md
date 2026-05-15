@@ -22,6 +22,7 @@ Runs on **port 9090** (`server.port=9090` in `application.properties`).
 |---|---|
 | `POST /api/annotate-feature` | Annotate raw LC-MS features with adduct hypotheses. |
 | `POST /api/rule-puntuation` | Annotate features and score them against Drools rules for a specific lipid class. |
+| `POST /api/reload-rules` | Reload the Drools decision tables from classpath without restarting the service. |
 
 ---
 
@@ -183,7 +184,7 @@ src/main/resources/rules/
   negative_intensityLT.xlsx   — wrong intensity order     (negative mode)
 ```
 
-At startup `DroolsConfig` loads all six workbooks.
+At startup `DroolsConfig` loads all six workbooks via `KieContainerProvider`. The container can be hot-reloaded at runtime via `POST /api/reload-rules` (see below).
 
 ### Rule Selection Within the Session
 
@@ -300,11 +301,14 @@ ceu.biolab.cmm
 │   ├── service/          RulePuntuationService
 │   └── dto/              RulePuntuationRequestDTO, RulePuntuationResponseDTO
 │
+├── rulesReload/
+│   └── controller/       RulesReloadController
+│
 ├── shared/
 │   ├── domain/           IonizationMode, MobilePhases, RuleTarget, SampleType, ToleranceMode
 │   └── dto/              FeatureAnnotation (AnnotatedFeature, ResultItem)
 │
-└── config/               DroolsConfig (loads six xlsx files at startup)
+└── config/               DroolsConfig, KieContainerProvider
 
 src/main/resources/
 ├── adducts/              CSV adduct catalogs (positive / negative)

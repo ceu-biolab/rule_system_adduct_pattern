@@ -8,7 +8,6 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.ThrowingSupplier;
-import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 
 import ceu.biolab.cmm.shared.domain.MobilePhases;
@@ -19,11 +18,11 @@ class DroolsConfigSmokeTest {
 
     @Test
     void loadsAndFiresAllRulesWithoutCompilationErrors() {
-        KieContainer kieContainer = new DroolsConfig().kieContainer();
+        KieContainerProvider provider = new KieContainerProvider();
         FeatureAnnotation.AnnotatedFeature lipid = new FeatureAnnotation.AnnotatedFeature();
         List<MobilePhases> mobilePhases = new ArrayList<>(List.of(MobilePhases.values()));
 
-        KieSession kieSession = kieContainer.newKieSession();
+        KieSession kieSession = provider.getContainer().newKieSession();
         try {
             kieSession.setGlobal("lipid", lipid);
             kieSession.setGlobal("mobilePhases", mobilePhases);
