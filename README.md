@@ -151,7 +151,7 @@ For every `(sourceSignal, sourceAdduct)` pair where the detected charge matches 
 | PPM | `mz × 10 / 1_000_000` | `mz × tolerance / 1_000_000` |
 | DALTON | `0.01 Da` | `tolerance Da` |
 
-If `tolerance` is omitted the defaults (10 ppm / 1 Da) apply.
+If `tolerance` is omitted the defaults (10 ppm / 0.01 Da) apply.
 
 ### Step 4 — Filter
 
