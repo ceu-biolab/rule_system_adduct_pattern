@@ -20,6 +20,10 @@ import ceu.biolab.cmm.shared.domain.RuleTarget;
 import ceu.biolab.cmm.shared.domain.SampleType;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
+/**
+ * Orchestrates polarity-specific adduct annotation and Drools scoring for one
+ * externally grouped LC-MS feature.
+ */
 @Service
 public class RulePuntuationService {
 
@@ -101,6 +105,7 @@ public class RulePuntuationService {
     private FeatureAnnotationRequestDTO buildAnnotationRequest(RulePuntuationRequestDTO request) {
         FeatureAnnotationRequestDTO dto = new FeatureAnnotationRequestDTO();
         dto.setFeatures(new ArrayList<>(request.getFeatures()));
+        dto.setIonizationMode(request.getIonizationMode());
         dto.setToleranceMode(request.getToleranceMode());
         dto.setTolerance(request.getTolerance());
         return dto;

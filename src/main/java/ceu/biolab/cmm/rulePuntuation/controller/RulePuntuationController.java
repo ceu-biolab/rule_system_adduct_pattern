@@ -10,6 +10,14 @@ import ceu.biolab.cmm.rulePuntuation.dto.RulePuntuationResponseDTO;
 import ceu.biolab.cmm.rulePuntuation.service.RulePuntuationService;
 import jakarta.validation.Valid;
 
+/**
+ * REST adapter for the complete expert-system operation.
+ *
+ * <p>{@code POST /api/rule-puntuation} first assigns adduct labels to one
+ * externally grouped feature and then scores each annotation hypothesis with
+ * the Drools rules selected by lipid class and polarity. The historical
+ * {@code puntuation} path spelling is retained as part of the public API.</p>
+ */
 @RestController
 @RequestMapping("/api")
 public class RulePuntuationController {
@@ -26,10 +34,10 @@ public class RulePuntuationController {
     }
 
     /**
-     * Receive the scoring request and return the best-matching annotated feature.
+     * Annotate and score one grouped chromatographic feature.
      *
-     * @param request rule punctuation input payload
-     * @return rule punctuation output payload
+     * @param request grouped signals, experimental context and target lipid class
+     * @return every surviving annotation hypothesis with its accumulated score
      */
     @PostMapping("/rule-puntuation")
     public RulePuntuationResponseDTO score(@Valid @RequestBody RulePuntuationRequestDTO request) {

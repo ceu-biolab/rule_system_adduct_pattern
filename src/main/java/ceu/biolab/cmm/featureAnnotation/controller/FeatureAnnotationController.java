@@ -10,6 +10,12 @@ import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
 import jakarta.validation.Valid;
 
+/**
+ * REST adapter for adduct labelling without expert-system scoring.
+ *
+ * <p>{@code POST /api/annotate-feature} accepts the signals of exactly one
+ * feature already grouped by an upstream process such as pyOpenMS.</p>
+ */
 @RestController
 @RequestMapping("/api")
 public class FeatureAnnotationController {
@@ -25,10 +31,10 @@ public class FeatureAnnotationController {
     }
 
     /**
-     * Receive the annotation request and return the transformed payload.
+     * Assign polarity-specific adduct labels to one grouped feature.
      *
-     * @param request feature annotation input payload
-     * @return feature annotation output payload
+     * @param request grouped signals, polarity and mass tolerance
+     * @return all surviving adduct-labelling hypotheses
      */
     @PostMapping("/annotate-feature")
     public FeatureAnnotationResultDTO annotateFeature(@Valid @RequestBody FeatureAnnotationRequestDTO request) {

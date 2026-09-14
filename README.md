@@ -18,10 +18,13 @@ Runs on **port 9090** (`server.port=9090` in `application.properties`).
 
 ## Endpoints
 
+The detailed HTTP contract and pyOpenMS integration boundary are documented in
+[docs/API.md](docs/API.md).
+
 | Endpoint | Description |
 |---|---|
-| `POST /api/annotate-feature` | Annotate raw LC-MS features with adduct hypotheses. |
-| `POST /api/rule-puntuation` | Annotate features and score them against Drools rules for a specific lipid class. |
+| `POST /api/annotate-feature` | Assign polarity-specific adduct labels to one externally grouped feature. |
+| `POST /api/rule-puntuation` | Assign adduct labels and score one externally grouped feature for a lipid-class candidate. |
 | `POST /api/reload-rules` | Reload the Drools decision tables from classpath without restarting the service. |
 
 ---
@@ -62,14 +65,15 @@ FeatureInput
 
 FeatureAnnotationRequestDTO
   features       List<FeatureInput>
+  ionizationMode IonizationMode        — POSITIVE | NEGATIVE
   toleranceMode  ToleranceMode        — PPM | DALTON
-  tolerance      Double               — optional, overrides the mode default (10 ppm / 1 Da)
+  tolerance      Double               — optional, overrides the mode default (10 ppm / 0.1 Da)
 
 RulePuntuationRequestDTO
   features       List<FeatureInput>
   mobilePhases   List<MobilePhases>   — e.g. [CH3COO, HCOO]
   toleranceMode  ToleranceMode        — PPM | DALTON
-  tolerance      Double               — optional, overrides the mode default (10 ppm / 1 Da)
+  tolerance      Double               — optional, overrides the mode default (10 ppm / 0.1 Da)
   ruleTarget     RuleTarget           — e.g. PC, TG, Cer, SM …
   ionizationMode IonizationMode       — POSITIVE | NEGATIVE
   sampleType     SampleType           — optional, default: PLASMA
@@ -109,7 +113,9 @@ ScoredFeature
 
 ## Feature Annotation
 
-All input signals are assumed to belong to the same chromatographic feature. No retention-time filtering is applied.
+All input signals are assumed to belong to the same chromatographic feature. An
+upstream process such as pyOpenMS must perform deconvolution and feature grouping;
+this service applies no retention-time filtering or grouping of its own.
 
 ### Step 1 — Sort signals
 
@@ -127,7 +133,9 @@ Each signal is checked against all other signals for isotopic spacing to determi
 
 ### Step 3 — Build hypothesis groups (one per signal × adduct)
 
-For every `(sourceSignal, sourceAdduct)` pair where the detected charge matches the adduct's absolute charge, a hypothesis group is built:
+Only definitions for the request's `ionizationMode` are considered. For every
+`(sourceSignal, sourceAdduct)` pair where the detected charge matches the
+adduct's absolute charge, a hypothesis group is built:
 
 ```
 1. Compute neutral mass from the source signal:
@@ -149,9 +157,9 @@ For every `(sourceSignal, sourceAdduct)` pair where the detected charge matches 
 | Mode | Default formula | Custom `tolerance` field |
 |---|---|---|
 | PPM | `mz × 10 / 1_000_000` | `mz × tolerance / 1_000_000` |
-| DALTON | `0.01 Da` | `tolerance Da` |
+| DALTON | `0.1 Da` | `tolerance Da` |
 
-If `tolerance` is omitted the defaults (10 ppm / 0.01 Da) apply.
+If `tolerance` is omitted the defaults (10 ppm / 0.1 Da) apply.
 
 ### Step 4 — Filter
 

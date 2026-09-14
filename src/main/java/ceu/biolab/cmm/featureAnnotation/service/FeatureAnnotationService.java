@@ -1,7 +1,6 @@
 package ceu.biolab.cmm.featureAnnotation.service;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -22,6 +21,16 @@ import ceu.biolab.cmm.shared.domain.adduct.AdductCatalog;
 import ceu.biolab.cmm.shared.domain.adduct.AdductDefinition;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
+/**
+ * Assigns polarity-specific adduct and diagnostic-ion labels to the signals of
+ * one feature group supplied by an upstream deconvolution pipeline.
+ *
+ * <p>For every signal and compatible ordinary adduct, the service constructs a
+ * neutral-mass hypothesis and labels the remaining signals with their closest
+ * matching definition. Fixed-m/z diagnostic ions may support a hypothesis but
+ * cannot establish one. The service deliberately performs no RT-based
+ * grouping; callers must submit one already-grouped feature per request.</p>
+ */
 @Service
 public class FeatureAnnotationService {
     private static final Logger LOGGER = LoggerFactory.getLogger(FeatureAnnotationService.class);
@@ -29,8 +38,14 @@ public class FeatureAnnotationService {
     // Isotope spacing indexed by charge (1–3); index 0 unused
     private static final double[] ISOTOPE_SPACINGS = {0.0, 1.0033, 0.5016, 0.3344};
     private static final double DEFAULT_PPM    = 10.0;
-    private static final double DEFAULT_DALTON = 1.0;
+    private static final double DEFAULT_DALTON = 0.1;
 
+    /**
+     * Generate, filter and deduplicate annotation hypotheses for one feature.
+     *
+     * @param input grouped signals, acquisition polarity and mass tolerance
+     * @return every surviving adduct-labelling hypothesis
+     */
     public FeatureAnnotationResultDTO transform(FeatureAnnotationRequestDTO input) {
         int n = input == null || input.getFeatures() == null ? 0 : input.getFeatures().size();
         List<FeatureAnnotation.AnnotatedFeature> candidates = buildCandidates(input);
@@ -40,6 +55,13 @@ public class FeatureAnnotationService {
         return output;
     }
 
+    /**
+     * Apply the minimum matched-ion threshold and remove duplicate hypotheses.
+     *
+     * @param results unfiltered hypotheses
+     * @param n number of input signals in the feature group
+     * @return filtered and deduplicated hypotheses
+     */
     public List<FeatureAnnotation.AnnotatedFeature> filter(
             List<FeatureAnnotation.AnnotatedFeature> results, int n) {
         if (results == null || results.isEmpty()) return List.of();
@@ -60,8 +82,13 @@ public class FeatureAnnotationService {
                 .sorted(Comparator.comparingDouble(FeatureAnnotationRequestDTO.FeatureInput::getMzValue))
                 .collect(Collectors.toList());
 
-        List<AdductDefinition> adducts = Arrays.stream(IonizationMode.values())
-                .flatMap(m -> AdductCatalog.definitionsFor(m).values().stream())
+        IonizationMode ionizationMode = input.getIonizationMode();
+        if (ionizationMode == null) return List.of();
+
+        List<AdductDefinition> adducts = new ArrayList<>(
+                AdductCatalog.definitionsFor(ionizationMode).values());
+        List<AdductDefinition> sourceAdducts = adducts.stream()
+                .filter(AdductDefinition::canInferNeutralMass)
                 .collect(Collectors.toList());
 
         ToleranceMode mode = input.getToleranceMode();
@@ -70,7 +97,7 @@ public class FeatureAnnotationService {
 
         for (FeatureAnnotationRequestDTO.FeatureInput signal : signals) {
             int charge = detectCharge(signal, signals, mode, customTolerance);
-            for (AdductDefinition sourceAdduct : adducts) {
+            for (AdductDefinition sourceAdduct : sourceAdducts) {
                 if (charge != sourceAdduct.absoluteCharge()) continue;
                 candidates.add(buildHypothesis(signal, signals, adducts, mode, customTolerance, sourceAdduct));
             }
@@ -84,8 +111,7 @@ public class FeatureAnnotationService {
             List<AdductDefinition> adducts,
             ToleranceMode mode, Double customTolerance,
             AdductDefinition sourceAdduct) {
-        double neutralMass = (source.getMzValue() * sourceAdduct.absoluteCharge() - sourceAdduct.offset())
-                / sourceAdduct.multimer();
+        double neutralMass = sourceAdduct.neutralMassFrom(source.getMzValue());
         LinkedHashSet<FeatureAnnotation.ResultItem> items = new LinkedHashSet<>();
         for (FeatureAnnotationRequestDTO.FeatureInput candidate : signals) {
             String adductName = candidate == source
@@ -108,7 +134,7 @@ public class FeatureAnnotationService {
         String best = null;
         double bestDelta = Double.POSITIVE_INFINITY;
         for (AdductDefinition adduct : adducts) {
-            double expected = (neutralMass * adduct.multimer() + adduct.offset()) / adduct.absoluteCharge();
+            double expected = adduct.expectedMz(neutralMass);
             double delta = Math.abs(signal.getMzValue() - expected);
             if (delta <= resolveTolerance(expected, mode, customTolerance) && delta < bestDelta) {
                 bestDelta = delta;
