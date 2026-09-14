@@ -9,12 +9,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 import ceu.biolab.cmm.config.KieContainerProvider;
 
+/** REST adapter for rebuilding the in-memory Drools rule container. */
 @RestController
 @RequestMapping("/api")
 public class RulesReloadController {
 
     private final KieContainerProvider kieContainerProvider;
 
+    /**
+     * Build the controller with the atomically replaceable rule container.
+     *
+     * @param kieContainerProvider provider of the active Drools container
+     */
     public RulesReloadController(KieContainerProvider kieContainerProvider) {
         this.kieContainerProvider = kieContainerProvider;
     }
@@ -28,7 +34,6 @@ public class RulesReloadController {
      */
     @PostMapping("/reload-rules")
     public ResponseEntity<String> reloadRules() {
-        
         Optional<String> error = kieContainerProvider.reload();
         return error
                 .map(msg -> ResponseEntity.internalServerError().body(msg))

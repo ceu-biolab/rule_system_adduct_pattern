@@ -11,11 +11,15 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import ceu.biolab.cmm.config.KieContainerProvider;
+import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
+import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
+import ceu.biolab.cmm.rulePuntuation.dto.RulePuntuationRequestDTO;
 import ceu.biolab.cmm.rulePuntuation.service.RulePuntuationService;
 import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.MobilePhases;
 import ceu.biolab.cmm.shared.domain.RuleTarget;
 import ceu.biolab.cmm.shared.domain.SampleType;
+import ceu.biolab.cmm.shared.domain.ToleranceMode;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.AnnotatedFeature;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation.ResultItem;
@@ -35,8 +39,7 @@ class RulePuntuationServiceTest {
     @BeforeAll
     static void buildService() {
         KieContainerProvider provider = new KieContainerProvider();
-        // featureAnnotationService is unused by scoreFeature
-        service = new RulePuntuationService(provider, null);
+        service = new RulePuntuationService(provider, new FeatureAnnotationService());
     }
 
     // -------------------------------------------------------------------------
@@ -166,6 +169,29 @@ class RulePuntuationServiceTest {
         );
     }
 
+    /** The REST-facing orchestration must pass polarity into feature annotation. */
+    @Test
+    void calculatePuntuation_propagatesPositivePolarityToAnnotation() {
+        RulePuntuationRequestDTO request = new RulePuntuationRequestDTO();
+        request.setIonizationMode(IonizationMode.POSITIVE);
+        request.setToleranceMode(ToleranceMode.PPM);
+        request.setTolerance(10.0);
+        request.setRuleTarget(RuleTarget.PC);
+        request.setSampleType(SampleType.PLASMA);
+        request.setMobilePhases(List.of(MobilePhases.CH3COO));
+        request.setFeatures(List.of(
+                input(501.007276, 1000.0),
+                input(522.989218, 500.0)));
+
+        var response = service.calculatePuntuation(request);
+
+        assertTrue(!response.getResults().isEmpty());
+        assertTrue(response.getResults().stream()
+                .flatMap(result -> result.getAnnotatedFeature().getItems().stream())
+                .filter(result -> result.getAdductName() != null)
+                .allMatch(result -> result.getAdductName().endsWith("+")));
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -177,6 +203,14 @@ class RulePuntuationServiceTest {
         item.setIntensity(intensity);
         item.setAdductName(adduct);
         return item;
+    }
+
+    private static FeatureAnnotationRequestDTO.FeatureInput input(double mz, double intensity) {
+        FeatureAnnotationRequestDTO.FeatureInput input = new FeatureAnnotationRequestDTO.FeatureInput();
+        input.setMzValue(mz);
+        input.setIntensity(intensity);
+        input.setRetentionTime(120.0);
+        return input;
     }
 
     private static AnnotatedFeature feature(ResultItem... items) {

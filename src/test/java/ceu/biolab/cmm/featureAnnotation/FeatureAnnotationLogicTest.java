@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationRequestDTO;
 import ceu.biolab.cmm.featureAnnotation.dto.FeatureAnnotationResultDTO;
 import ceu.biolab.cmm.featureAnnotation.service.FeatureAnnotationService;
+import ceu.biolab.cmm.shared.domain.IonizationMode;
 import ceu.biolab.cmm.shared.domain.ToleranceMode;
 import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
@@ -36,6 +37,7 @@ class FeatureAnnotationLogicTest {
     void adductCombination_success() {
         FeatureAnnotationService service = new FeatureAnnotationService();
         FeatureAnnotationRequestDTO request = new FeatureAnnotationRequestDTO();
+        request.setIonizationMode(IonizationMode.POSITIVE);
         request.setToleranceMode(ToleranceMode.PPM);
 
         double neutralMass = 200.0 - PROTON_MASS;

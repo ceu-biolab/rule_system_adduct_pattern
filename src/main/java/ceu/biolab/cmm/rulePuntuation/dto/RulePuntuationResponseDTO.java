@@ -7,11 +7,14 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** Response from expert-system scoring for one grouped input feature. */
 @Data
 public class RulePuntuationResponseDTO {
 
+    /** Scored annotation hypotheses in deterministic annotation order. */
     private List<ScoredFeature> results;
 
+    /** One adduct-labelling hypothesis and the Drools evidence accumulated for it. */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
