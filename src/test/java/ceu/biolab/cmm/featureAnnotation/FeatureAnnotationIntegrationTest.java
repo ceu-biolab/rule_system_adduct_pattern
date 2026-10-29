@@ -40,6 +40,30 @@ class FeatureAnnotationIntegrationTest {
 
         assertTrue(findHypothesis(response, 200.0 + PROTON_MASS, "[M+H]+",
                                              200.0 + SODIUM_MASS,  "[M+Na]+"));
+        FeatureAnnotation.AnnotatedFeature hypothesis = response.getResults().stream()
+                .filter(group -> item(group, 200.0 + PROTON_MASS)
+                        .filter(result -> "[M+H]+".equals(result.getAdductName())).isPresent())
+                .findFirst()
+                .orElseThrow();
+        assertEquals(200.0, hypothesis.getNeutralMass(), 1e-9);
+        assertNotNull(hypothesis.getHypothesisId());
+        assertTrue(hypothesis.getHypothesisId().startsWith("hyp-"));
+    }
+
+    @Test
+    void transform_sameInputProducesStableHypothesisIds() {
+        FeatureAnnotationRequestDTO request = request(ToleranceMode.PPM, null,
+                feature(200.0 + PROTON_MASS, 1000.0),
+                feature(200.0 + SODIUM_MASS, 500.0));
+
+        List<String> first = service.transform(request).getResults().stream()
+                .map(FeatureAnnotation.AnnotatedFeature::getHypothesisId)
+                .toList();
+        List<String> second = service.transform(request).getResults().stream()
+                .map(FeatureAnnotation.AnnotatedFeature::getHypothesisId)
+                .toList();
+
+        assertEquals(first, second);
     }
 
     @Test

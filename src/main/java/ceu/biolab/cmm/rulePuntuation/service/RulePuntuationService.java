@@ -60,9 +60,13 @@ public class RulePuntuationService {
         List<RulePuntuationResponseDTO.ScoredFeature> scored = new ArrayList<>();
         for (FeatureAnnotation.AnnotatedFeature feature : annotationResult.getResults()) {
             applyRules(feature, request.getMobilePhases(), rulePrefix, request.getSampleType());
+            boolean hasEvidence = feature.hasEvidence();
             scored.add(new RulePuntuationResponseDTO.ScoredFeature(
                     feature,
                     feature.getScore(),
+                    feature.getNormalizedScore(),
+                    hasEvidence,
+                    RulePuntuationResponseDTO.EvidenceStatus.from(feature.getScore(), hasEvidence),
                     feature.getDescrCorrect(),
                     feature.getDescrIncorrect(),
                     feature.getAppliedPresence(),

@@ -9,10 +9,21 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+/** Shared response models for neutral-mass/adduct annotation hypotheses. */
 public class FeatureAnnotation {
 
+    /**
+     * One inferred neutral-mass hypothesis and the measured signals labelled
+     * relative to that hypothesis.
+     */
     @Data
     public static class AnnotatedFeature {
+        /** Stable identifier derived from the neutral mass and labelled signals. */
+        private String hypothesisId;
+
+        /** Neutral monoisotopic mass inferred from the source ion hypothesis. */
+        private Double neutralMass;
+
         @NotEmpty
         @Valid
         private Set<ResultItem> items = new LinkedHashSet<>();
@@ -26,7 +37,11 @@ public class FeatureAnnotation {
         @JsonIgnore
         public int getScore() { return score; }
 
-        /** Each rule call adds its delta — never replaces. */
+        /**
+         * Add one rule's evidence contribution to the accumulated score.
+         *
+         * @param delta signed evidence contribution
+         */
         public void setScore(int delta) { this.score += delta; }
 
         @JsonIgnore
@@ -49,6 +64,34 @@ public class FeatureAnnotation {
 
         public void setAppliedIntensity(int appliedIntensity) { this.appliedIntensity = appliedIntensity; }
 
+        /**
+         * Calculate the manuscript's evidence-balance score.
+         *
+         * <p>Activated occurrence rules have absolute weight one and activated
+         * intensity rules have absolute weight two. When no rule generated
+         * evidence, the denominator is zero and the result is {@code null}.</p>
+         *
+         * @return raw score divided by the maximum absolute activated evidence,
+         *         or {@code null} when there is no evidence
+         */
+        @JsonIgnore
+        public Double getNormalizedScore() {
+            int maximumAbsoluteScore = appliedPresence + (2 * appliedIntensity);
+            return maximumAbsoluteScore == 0
+                    ? null
+                    : (double) score / maximumAbsoluteScore;
+        }
+
+        /**
+         * Determine whether at least one rule generated non-zero evidence.
+         *
+         * @return {@code true} when an occurrence or intensity rule contributed
+         */
+        @JsonIgnore
+        public boolean hasEvidence() {
+            return appliedPresence > 0 || appliedIntensity > 0;
+        }
+
         public Set<ResultItem> getItems() { return items; }
 
         public void setItems(Set<ResultItem> items) {
@@ -65,6 +108,7 @@ public class FeatureAnnotation {
         }
     }
 
+    /** One measured signal and its optional polarity-specific ion label. */
     @Data
     public static class ResultItem {
         @NotNull

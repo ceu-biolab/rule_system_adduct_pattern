@@ -37,7 +37,7 @@ public class RulePuntuationController {
      * Annotate and score one grouped chromatographic feature.
      *
      * @param request grouped signals, experimental context and target lipid class
-     * @return every surviving annotation hypothesis with its accumulated score
+     * @return every surviving annotation hypothesis with its raw and normalized scores
      */
     @PostMapping("/rule-puntuation")
     public RulePuntuationResponseDTO score(@Valid @RequestBody RulePuntuationRequestDTO request) {

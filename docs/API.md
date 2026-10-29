@@ -101,6 +101,8 @@ Response:
 {
   "results": [
     {
+      "hypothesisId": "hyp-9ef91ba9-48f5-3db0-bf8c-3749f5d64ddc",
+      "neutralMass": 200.0,
       "items": [
         {
           "mzValue": 201.007276,
@@ -120,10 +122,13 @@ Response:
 }
 ```
 
-The result may contain several neutral-mass/adduct hypotheses. A signal that
-does not match a definition has `adductName: null`. Hypotheses require at least
-two matched signals for groups of up to four inputs, or three matched signals
-for larger groups.
+The result may contain several neutral-mass/adduct hypotheses. `hypothesisId`
+is deterministically derived from the inferred neutral mass and labelled input
+signals, allowing clients to join the result to later CMM searches and scoring
+operations. `neutralMass` is the neutral monoisotopic mass inferred from the
+source ion. A signal that does not match a definition has `adductName: null`.
+Hypotheses require at least two matched signals for groups of up to four inputs,
+or three matched signals for larger groups.
 
 ## POST `/api/rule-puntuation`
 
@@ -163,6 +168,8 @@ Response:
   "results": [
     {
       "annotatedFeature": {
+        "hypothesisId": "hyp-9ef91ba9-48f5-3db0-bf8c-3749f5d64ddc",
+        "neutralMass": 200.0,
         "items": [
           {
             "mzValue": 201.007276,
@@ -173,6 +180,9 @@ Response:
         ]
       },
       "score": 3,
+      "normalizedScore": 1.0,
+      "hasEvidence": true,
+      "evidenceStatus": "SUPPORTING",
       "descrCorrect": "Contains [M+H]+, ...",
       "descrIncorrect": "",
       "appliedPresence": 1,
@@ -182,11 +192,31 @@ Response:
 }
 ```
 
-Scores accumulate across fired rules. Positive values indicate supporting
-evidence, negative values indicate contradictory evidence, and zero indicates
-that the selected rules produced no net evidence. Consumers should retain the
-rule counts and descriptions instead of interpreting the score as a calibrated
+`score` is the raw weighted evidence sum: occurrence rules contribute ±1 and
+relative-intensity rules contribute ±2. The manuscript-defined normalized score
+is `score / (appliedPresence + 2 * appliedIntensity)` and ranges from −1 to +1.
+A zero normalized score means activated supporting and contradicting evidence
+balanced. When no rule generated evidence, `score` remains zero while
+`normalizedScore` is JSON `null`, `hasEvidence` is `false`, and
+`evidenceStatus` is `"NO_EVIDENCE"`. This is distinct from activated evidence
+with `score: 0`, `normalizedScore: 0.0`, `hasEvidence: true`, and
+`evidenceStatus: "BALANCED"`. The other statuses are `"SUPPORTING"` and
+`"CONTRADICTING"`. Consumers should retain the raw score, rule counts and
+descriptions instead of interpreting the normalized score as a calibrated
 probability.
+
+No-evidence fields therefore have the following shape:
+
+```json
+{
+  "score": 0,
+  "normalizedScore": null,
+  "hasEvidence": false,
+  "evidenceStatus": "NO_EVIDENCE",
+  "appliedPresence": 0,
+  "appliedIntensity": 0
+}
+```
 
 ## POST `/api/reload-rules`
 

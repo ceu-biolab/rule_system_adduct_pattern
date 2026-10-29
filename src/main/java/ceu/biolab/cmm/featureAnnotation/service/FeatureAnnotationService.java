@@ -1,5 +1,6 @@
 package ceu.biolab.cmm.featureAnnotation.service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -7,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -126,7 +128,18 @@ public class FeatureAnnotationService {
         }
         FeatureAnnotation.AnnotatedFeature hypothesis = new FeatureAnnotation.AnnotatedFeature();
         hypothesis.setItems(items);
+        hypothesis.setNeutralMass(neutralMass);
+        hypothesis.setHypothesisId(buildHypothesisId(hypothesis));
         return hypothesis;
+    }
+
+    /**
+     * Build a deterministic identifier so clients can join an annotation
+     * hypothesis to later compound-search and rule-scoring results.
+     */
+    private String buildHypothesisId(FeatureAnnotation.AnnotatedFeature hypothesis) {
+        String identity = Double.toString(hypothesis.getNeutralMass()) + "|" + signature(hypothesis);
+        return "hyp-" + UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8));
     }
 
     private String bestAdductFor(FeatureAnnotationRequestDTO.FeatureInput signal, double neutralMass,

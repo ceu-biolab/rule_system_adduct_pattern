@@ -11,7 +11,8 @@ import ceu.biolab.cmm.shared.dto.FeatureAnnotation;
 
 /**
  * Response containing the surviving adduct-labelling hypotheses for one input
- * feature group.
+ * feature group. Each result exposes its inferred neutral mass and a stable
+ * hypothesis identifier for downstream compound-search joins.
  */
 @Data
 public class FeatureAnnotationResultDTO {

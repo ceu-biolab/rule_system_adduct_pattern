@@ -1,6 +1,7 @@
 package ceu.biolab.cmm.rulePuntuation;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.LinkedHashSet;
@@ -186,6 +187,13 @@ class RulePuntuationServiceTest {
         var response = service.calculatePuntuation(request);
 
         assertTrue(!response.getResults().isEmpty());
+        assertEquals(
+                response.getResults().get(0).getAnnotatedFeature().getNormalizedScore(),
+                response.getResults().get(0).getNormalizedScore());
+        assertEquals(
+                response.getResults().get(0).getAnnotatedFeature().hasEvidence(),
+                response.getResults().get(0).isHasEvidence());
+        assertTrue(response.getResults().get(0).getEvidenceStatus() != null);
         assertTrue(response.getResults().stream()
                 .flatMap(result -> result.getAnnotatedFeature().getItems().stream())
                 .filter(result -> result.getAdductName() != null)

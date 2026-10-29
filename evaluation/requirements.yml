@@ -1,0 +1,14 @@
+name: lipid-rule-evaluation
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - openjdk=21
+  - maven>=3.9,<4
+  - numpy>=1.25,<3
+  - openpyxl>=3.1,<4
+  - pytest>=8.3,<9
+  - pip
+  - pip:
+      - pyopenms==3.5.0
+      - psycopg[binary]>=3.2,<4

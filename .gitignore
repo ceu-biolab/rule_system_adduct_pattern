@@ -13,3 +13,8 @@ DEPLOYMENT.md
 __temp
 batch_search_requests/
 mz_values.csv
+evaluation/results/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/

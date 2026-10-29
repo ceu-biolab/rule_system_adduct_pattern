@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lipid-rule-evaluation"
+version = "0.1.0"
+description = "pyOpenMS preprocessing and feature-grouping evaluation for the lipid adduct rule system"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+    "numpy>=1.25,<3",
+    "openpyxl>=3.1,<4",
+    "pyopenms==3.5.0",
+    "psycopg[binary]>=3.2,<4",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[project.scripts]
+lipid-eval = "lipid_rule_eval.cli:main"
+lipid-annotate = "lipid_rule_eval.annotation_cli:main"
+lipid-rules = "lipid_rule_eval.rule_cli:main"
+lipid-metrics = "lipid_rule_eval.metrics_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

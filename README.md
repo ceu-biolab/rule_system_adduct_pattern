@@ -21,6 +21,11 @@ Runs on **port 9090** (`server.port=9090` in `application.properties`).
 The detailed HTTP contract and pyOpenMS integration boundary are documented in
 [docs/API.md](docs/API.md).
 
+The executable one-file-per-polarity pyOpenMS preprocessing pilot, including
+its configuration and JSON/CSV output contract, is documented in
+[evaluation/README.md](evaluation/README.md). It stops before CMM lookup,
+adduct annotation, and rule execution.
+
 | Endpoint | Description |
 |---|---|
 | `POST /api/annotate-feature` | Assign polarity-specific adduct labels to one externally grouped feature. |
@@ -102,7 +107,10 @@ RulePuntuationResponseDTO
 
 ScoredFeature
   annotatedFeature  AnnotatedFeature   — signal set with adduct assignments
-  score             int                — final accumulated score
+  score             int                — raw accumulated evidence score
+  normalizedScore   Double             — normalized balance; null without evidence
+  hasEvidence       boolean            — at least one rule contributed
+  evidenceStatus    EvidenceStatus     — explicit evidence interpretation
   descrCorrect      String             — reasons for positive score
   descrIncorrect    String             — reasons for negative score
   appliedPresence   int
@@ -277,12 +285,17 @@ Some adducts only form in specific solvent systems. Rules condition their firing
 ### Score Interpretation
 
 ```
-score > 0   — consistent with the expected adduct pattern for this lipid class
-score = 0   — no matching rules fired (no evidence either way)
-score < 0   — pattern contradicts expectations for this lipid class
+score > 0   — supporting evidence predominates
+score = 0   — balanced evidence or no activated evidence
+score < 0   — contradicting evidence predominates
 ```
 
-`appliedPresence` and `appliedIntensity` count how many rules of each type fired, allowing downstream consumers to normalise the score.
+`appliedPresence` and `appliedIntensity` count how many rules of each type
+generated non-zero evidence. The normalized evidence-balance score is
+`score / (appliedPresence + 2 * appliedIntensity)` and ranges from −1 to +1.
+When both counters are zero the API returns a null normalized score,
+`hasEvidence: false`, and `evidenceStatus: "NO_EVIDENCE"`; this is distinct from
+a normalized value of zero with `evidenceStatus: "BALANCED"`.
 
 ---
 
